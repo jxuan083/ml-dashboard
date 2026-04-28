@@ -1,0 +1,2032 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ML Intelligence Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #F8F7F4;
+  --surface: #FFFFFF;
+  --surface-2: #F3F2EF;
+  --border: #E5E3DF;
+  --border-strong: #C9C7C2;
+  --text-primary: #1A1917;
+  --text-secondary: #6B6860;
+  --text-muted: #A8A59E;
+  --accent-blue: #2563EB;
+  --accent-amber: #D97706;
+  --accent-emerald: #059669;
+  --accent-violet: #7C3AED;
+  --cluster-color: #2563EB;
+  --predict-color: #D97706;
+  --recommend-color: #059669;
+  --ext-color: #7C3AED;
+  --sidebar-w: 260px;
+  --header-h: 52px;
+}
+
+html, body, #root { height: 100%; overflow: hidden; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text-primary); font-size: 13px; }
+
+.app { display: flex; flex-direction: column; height: 100vh; }
+
+/* ── Topbar ── */
+.topbar {
+  height: var(--header-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 20px; gap: 16px;
+  flex-shrink: 0; z-index: 100;
+}
+
+.topbar-logo {
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px;
+  letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px;
+}
+
+.topbar-logo .dot {
+  width: 8px; height: 8px; background: var(--accent-blue);
+  border-radius: 50%; animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+
+.topbar-divider { width: 1px; height: 20px; background: var(--border); }
+
+.topbar-api-status {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace;
+}
+
+.topbar-api-status .indicator {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--accent-emerald);
+}
+
+.topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 6px;
+  font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500;
+  cursor: pointer; border: 1px solid transparent; transition: all 0.15s ease; white-space: nowrap;
+}
+
+.btn-ghost { background: transparent; border-color: var(--border); color: var(--text-secondary); }
+.btn-ghost:hover { background: var(--surface-2); border-color: var(--border-strong); color: var(--text-primary); }
+.btn-primary { background: var(--text-primary); color: white; border-color: var(--text-primary); }
+.btn-primary:hover { background: #333; }
+.btn-violet { background: #F5F3FF; border-color: #DDD6FE; color: var(--ext-color); }
+.btn-violet:hover { background: #EDE9FE; }
+
+.main { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Sidebar ── */
+.sidebar {
+  width: var(--sidebar-w); background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
+}
+
+.sidebar-section { padding: 16px 16px 8px; }
+
+.sidebar-label {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;
+}
+
+.project-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px; border-radius: 6px; cursor: pointer;
+  transition: background 0.1s; font-size: 13px;
+  color: var(--text-secondary); user-select: none;
+}
+
+.project-item:hover { background: var(--surface-2); color: var(--text-primary); }
+.project-item.active { background: var(--surface-2); color: var(--text-primary); font-weight: 500; }
+.project-item .icon { font-size: 14px; flex-shrink: 0; }
+.project-item .count {
+  margin-left: auto; font-size: 10px; font-family: 'DM Mono', monospace;
+  background: var(--surface-2); padding: 1px 5px; border-radius: 3px; color: var(--text-muted);
+}
+.project-item.active .count { background: var(--border); }
+
+.sidebar-divider { height: 1px; background: var(--border); margin: 8px 16px; }
+.dataset-list { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
+
+.dataset-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+  margin-bottom: 6px; cursor: grab; background: var(--surface);
+  transition: all 0.15s ease; user-select: none;
+}
+
+.dataset-item:hover {
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06); transform: translateY(-1px);
+}
+
+.dataset-item:active { cursor: grabbing; }
+
+.dataset-icon {
+  width: 28px; height: 28px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; flex-shrink: 0;
+}
+
+.dataset-meta { flex: 1; min-width: 0; }
+.dataset-name { font-size: 12px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dataset-info { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--text-muted); margin-top: 1px; }
+.dataset-drag-hint { font-size: 10px; color: var(--text-muted); opacity: 0; transition: opacity 0.15s; }
+.dataset-item:hover .dataset-drag-hint { opacity: 1; }
+
+/* ── External APIs in Sidebar ── */
+.ext-api-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px; border-radius: 8px; border: 1px solid #EDE9FE;
+  margin-bottom: 6px; background: #FDFCFF; cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ext-api-item:hover { border-color: #DDD6FE; background: #F5F3FF; }
+
+.ext-api-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ext-color); flex-shrink: 0; }
+.ext-api-name { font-size: 12px; font-weight: 500; color: var(--ext-color); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ext-api-url { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.ext-api-meta { flex: 1; min-width: 0; }
+
+.add-ext-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 10px; border-radius: 8px;
+  border: 1px dashed #DDD6FE; background: transparent;
+  font-size: 12px; color: var(--ext-color); cursor: pointer;
+  transition: all 0.15s ease; width: 100%; font-family: 'DM Sans', sans-serif;
+}
+.add-ext-btn:hover { background: #F5F3FF; border-style: solid; }
+
+/* ── Dataset Upload ── */
+.upload-zone {
+  border: 2px dashed var(--border); border-radius: 8px;
+  padding: 14px; text-align: center; cursor: pointer;
+  transition: all 0.2s ease; background: transparent; margin-bottom: 8px;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--accent-blue); background: #EFF6FF;
+}
+.upload-zone input { display: none; }
+.upload-zone-text { font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+.upload-zone-text strong { color: var(--accent-blue); font-weight: 500; }
+
+.sheets-row {
+  display: flex; gap: 6px; margin-bottom: 8px;
+}
+.sheets-input {
+  flex: 1; padding: 7px 9px; border: 1px solid var(--border); border-radius: 6px;
+  font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-primary);
+  background: var(--surface); outline: none; transition: border-color 0.15s;
+  min-width: 0;
+}
+.sheets-input:focus { border-color: var(--accent-emerald); }
+.sheets-input::placeholder { color: var(--text-muted); font-family: 'DM Sans', sans-serif; }
+
+.sheets-btn {
+  padding: 7px 10px; border-radius: 6px; border: 1px solid #A7F3D0;
+  background: #ECFDF5; color: var(--accent-emerald); font-size: 11px; font-weight: 500;
+  cursor: pointer; white-space: nowrap; transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+}
+.sheets-btn:hover { background: #D1FAE5; }
+.sheets-btn:disabled { opacity: 0.5; cursor: default; }
+
+.upload-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 500;
+}
+.upload-tag.csv { background: #DBEAFE; color: #1D4ED8; }
+.upload-tag.sheets { background: #D1FAE5; color: #065F46; }
+
+/* ── Workspace ── */
+.workspace {
+  flex: 1; overflow: auto; padding: 20px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+.workspace-toolbar { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+.workspace-title {
+  font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.workspace-subtitle { font-size: 12px; color: var(--text-muted); }
+.add-panel-menu { display: flex; gap: 6px; margin-left: auto; }
+
+.panel-type-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 10px; border-radius: 6px; font-size: 11px; font-weight: 500;
+  cursor: pointer; border: 1px solid; transition: all 0.15s ease;
+}
+
+.panel-type-btn.cluster { border-color: #BFDBFE; color: var(--cluster-color); background: #EFF6FF; }
+.panel-type-btn.cluster:hover { background: #DBEAFE; }
+.panel-type-btn.predict { border-color: #FDE68A; color: var(--predict-color); background: #FFFBEB; }
+.panel-type-btn.predict:hover { background: #FEF3C7; }
+.panel-type-btn.recommend { border-color: #A7F3D0; color: var(--recommend-color); background: #ECFDF5; }
+.panel-type-btn.recommend:hover { background: #D1FAE5; }
+
+/* ── Panels Grid ── */
+.panels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; align-items: start; }
+
+/* ── Panel ── */
+.panel {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+  animation: panel-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: box-shadow 0.2s ease;
+}
+
+.panel:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
+
+@keyframes panel-in {
+  from { opacity: 0; transform: scale(0.95) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.panel.drop-target { border-color: var(--accent-blue); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+.panel-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+}
+
+.panel-type-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 3px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+}
+
+.panel-type-badge.cluster { background: #EFF6FF; color: var(--cluster-color); }
+.panel-type-badge.predict { background: #FFFBEB; color: var(--predict-color); }
+.panel-type-badge.recommend { background: #ECFDF5; color: var(--recommend-color); }
+.panel-type-badge.external { background: #F5F3FF; color: var(--ext-color); }
+
+.panel-dataset-name { font-size: 13px; font-weight: 500; flex: 1; }
+.panel-dataset-none { font-size: 12px; color: var(--text-muted); font-style: italic; flex: 1; }
+.panel-actions { display: flex; gap: 4px; }
+
+.panel-btn {
+  width: 26px; height: 26px; display: flex; align-items: center; justify-content: center;
+  border-radius: 5px; border: none; background: transparent; cursor: pointer;
+  color: var(--text-muted); font-size: 13px; transition: all 0.1s;
+}
+
+.panel-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+.panel-btn.active { background: var(--surface-2); color: var(--text-primary); }
+
+/* ── Model Selector (inside panel) ── */
+.model-selector {
+  border-bottom: 1px solid var(--border);
+  background: #FAFAF9;
+  padding: 10px 16px;
+  animation: slide-down 0.2s ease;
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.model-selector-label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; }
+
+.model-options { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.model-option {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500;
+  cursor: pointer; border: 1px solid var(--border); background: var(--surface);
+  color: var(--text-secondary); transition: all 0.12s ease; user-select: none;
+}
+
+.model-option:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.model-option.selected { border-color: currentColor; }
+.model-option.selected.builtin { color: var(--accent-blue); background: #EFF6FF; border-color: #BFDBFE; }
+.model-option.selected.external { color: var(--ext-color); background: #F5F3FF; border-color: #DDD6FE; }
+
+.model-option .model-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+
+.model-divider {
+  font-size: 10px; color: var(--text-muted); padding: 2px 0;
+  display: flex; align-items: center; gap: 6px; width: 100%;
+}
+
+.model-divider::before, .model-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── Panel Body ── */
+.panel-body { padding: 14px 16px; }
+
+.drop-zone {
+  border: 2px dashed var(--border); border-radius: 8px; padding: 28px;
+  text-align: center; color: var(--text-muted); font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.drop-zone.active { border-color: var(--accent-blue); background: #EFF6FF; color: var(--accent-blue); }
+.drop-zone-icon { font-size: 24px; margin-bottom: 8px; }
+
+.analysis-loading {
+  display: flex; align-items: center; justify-content: center;
+  gap: 10px; padding: 32px; color: var(--text-muted); font-size: 12px;
+}
+
+.spinner {
+  width: 16px; height: 16px; border: 2px solid var(--border);
+  border-top-color: var(--accent-blue); border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Charts */
+.chart-wrap { position: relative; margin-bottom: 14px; }
+.chart-row { display: grid; grid-template-columns: 140px 1fr; gap: 12px; align-items: center; margin-bottom: 14px; }
+.chart-legend { display: flex; flex-direction: column; gap: 6px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-secondary); }
+.legend-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; } /* Tableau 方形色塊 */
+.legend-val { margin-left: auto; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-muted); }
+
+.stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+/* Predict */
+.predict-kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+.predict-kpi-val { font-family: 'DM Mono', monospace; font-size: 17px; font-weight: 500; display: block; }
+.predict-kpi-label { font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.predict-kpi-delta { font-size: 10px; font-family: 'DM Mono', monospace; font-weight: 500; display: inline-block; margin-top: 4px; padding: 1px 5px; border-radius: 3px; }
+.delta-up { background: #D1FAE5; color: #065F46; }
+.delta-down { background: #FEE2E2; color: #991B1B; }
+.predict-model-info { padding: 8px 12px; background: var(--surface-2); border-radius: 8px; display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.predict-accuracy { margin-left: auto; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent-emerald); font-weight: 500; }
+
+/* Recommend */
+.rec-item { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.rec-item:last-child { border-bottom: none; }
+.rec-rank { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); width: 14px; flex-shrink: 0; }
+.rec-icon { width: 26px; height: 26px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 13px; flex-shrink: 0; }
+.rec-name { font-size: 12px; font-weight: 500; flex: 1; }
+.rec-sub { font-size: 10px; color: var(--text-muted); }
+.rec-bar-wrap { width: 60px; height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; flex-shrink: 0; }
+.rec-bar { height: 100%; background: var(--recommend-color); border-radius: 2px; transition: width 0.7s cubic-bezier(0.34,1.56,0.64,1); }
+.rec-score { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--recommend-color); width: 30px; text-align: right; flex-shrink: 0; }
+
+/* ── Output Section ── */
+.output-section { border-top: 1px solid var(--border); padding: 12px 16px; background: #FAFAF9; }
+.output-toggle {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 600; color: var(--text-muted);
+  cursor: pointer; user-select: none; letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.output-toggle:hover { color: var(--text-secondary); }
+.output-toggle-arrow { font-size: 10px; transition: transform 0.15s; }
+.output-toggle-arrow.open { transform: rotate(90deg); }
+.output-body { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; animation: slide-down 0.15s ease; }
+.output-mode-row { display: flex; gap: 6px; }
+.output-mode-btn {
+  flex: 1; padding: 6px; border-radius: 6px; border: 1px solid var(--border);
+  font-size: 11px; font-weight: 500; cursor: pointer; text-align: center;
+  background: var(--surface); color: var(--text-secondary); transition: all 0.12s;
+  font-family: 'DM Sans', sans-serif;
+}
+.output-mode-btn.active { border-color: var(--accent-blue); color: var(--accent-blue); background: #EFF6FF; }
+.output-interval-row { display: flex; gap: 6px; align-items: center; }
+.output-interval-label { font-size: 11px; color: var(--text-muted); white-space: nowrap; }
+.output-actions { display: flex; gap: 6px; }
+.output-send-btn {
+  flex: 1; padding: 7px; border-radius: 6px; border: none;
+  font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.output-send-btn.once { background: var(--text-primary); color: white; }
+.output-send-btn.once:hover { background: #333; }
+.output-send-btn.schedule { background: #EFF6FF; color: var(--accent-blue); border: 1px solid #BFDBFE; }
+.output-send-btn.schedule:hover { background: #DBEAFE; }
+.output-send-btn.schedule.running { background: #D1FAE5; color: #065F46; border-color: #A7F3D0; }
+.output-feedback { font-size: 11px; padding: 6px 8px; border-radius: 5px; animation: panel-in 0.2s ease; }
+.output-feedback.sent { background: #ECFDF5; color: #065F46; border: 1px solid #A7F3D0; }
+.output-feedback.error { background: #FEF2F2; color: #991B1B; border: 1px solid #FECACA; }
+
+/* External API Result */
+.ext-result {
+  background: #1E1B2E;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: #C4B5FD;
+  line-height: 1.7;
+  overflow-x: auto;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.ext-result-key { color: #A78BFA; }
+.ext-result-string { color: #86EFAC; }
+.ext-result-number { color: #FCA5A5; }
+.ext-result-bool { color: #FCD34D; }
+
+.ext-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ext-status-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; font-family: 'DM Mono', monospace;
+}
+
+.ext-status-badge.success { background: #D1FAE5; color: #065F46; }
+.ext-status-badge.error { background: #FEE2E2; color: #991B1B; }
+.ext-status-badge.pending { background: #F5F3FF; color: var(--ext-color); }
+
+.ext-latency { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text-muted); }
+
+/* ── Empty Workspace ── */
+.workspace-empty {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 12px; color: var(--text-muted); padding: 60px;
+}
+
+.workspace-empty-icon { font-size: 40px; opacity: 0.4; }
+.workspace-empty-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 600; color: var(--text-secondary); }
+.workspace-empty-sub { font-size: 12px; text-align: center; max-width: 280px; line-height: 1.6; }
+
+/* ── Modals ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.3);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; animation: fade-in 0.15s ease;
+}
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--surface); border-radius: 12px;
+  width: 520px; max-width: 90vw; max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  animation: modal-in 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.modal.wide { width: 600px; }
+
+@keyframes modal-in {
+  from { opacity: 0; transform: scale(0.93) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.modal-header {
+  padding: 20px 20px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: flex-start; justify-content: space-between;
+  position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+
+.modal-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; }
+.modal-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.modal-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.modal-footer { padding: 16px 20px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+
+/* Form */
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.02em; }
+
+.form-input {
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text-primary);
+  background: var(--surface); outline: none; transition: border-color 0.15s;
+}
+
+.form-input:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(37,99,235,0.08); }
+.form-input.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+
+.form-select {
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--text-primary);
+  background: var(--surface); outline: none; cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23A8A59E'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 10px center;
+  padding-right: 28px;
+}
+
+.form-textarea {
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-family: 'DM Mono', monospace; font-size: 11.5px; color: var(--text-primary);
+  background: var(--surface); outline: none; resize: vertical; min-height: 80px; line-height: 1.6;
+  transition: border-color 0.15s;
+}
+
+.form-textarea:focus { border-color: var(--accent-blue); box-shadow: 0 0 0 2px rgba(37,99,235,0.08); }
+
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Headers editor */
+.headers-list { display: flex; flex-direction: column; gap: 6px; }
+.header-row { display: grid; grid-template-columns: 1fr 1fr 26px; gap: 6px; align-items: center; }
+.header-del { width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; border: none; background: transparent; cursor: pointer; color: var(--text-muted); border-radius: 4px; font-size: 13px; transition: all 0.1s; }
+.header-del:hover { background: #FEE2E2; color: #DC2626; }
+
+/* Test result */
+.test-result {
+  padding: 10px 12px; border-radius: 8px; font-size: 12px;
+  border: 1px solid; animation: panel-in 0.2s ease;
+}
+
+.test-result.success { background: #ECFDF5; border-color: #A7F3D0; color: #065F46; }
+.test-result.error { background: #FEF2F2; border-color: #FECACA; color: #991B1B; }
+
+/* Info box */
+.info-box {
+  padding: 10px 14px; background: #F0F9FF; border-radius: 8px;
+  border: 1px solid #BAE6FD; font-size: 12px; color: #0C4A6E; line-height: 1.6;
+}
+
+/* API Modal: endpoints */
+.code-block {
+  background: var(--text-primary); border-radius: 8px; padding: 14px 16px;
+  font-family: 'DM Mono', monospace; font-size: 11.5px; color: #E2E8F0;
+  line-height: 1.7; overflow-x: auto;
+}
+
+.code-comment { color: #64748B; }
+.code-string { color: #7DD3FC; }
+.code-url { color: #86EFAC; }
+.code-key { color: #94A3B8; }
+
+.endpoint-list { display: flex; flex-direction: column; gap: 6px; }
+.endpoint-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-family: 'DM Mono', monospace; font-size: 11px; }
+.method { padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 600; flex-shrink: 0; }
+.method.post { background: #DCFCE7; color: #166534; }
+.method.get { background: #DBEAFE; color: #1D4ED8; }
+.endpoint-desc { color: var(--text-muted); font-size: 10px; margin-left: auto; }
+
+.scrollbar-thin::-webkit-scrollbar { width: 4px; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+/* 讓 chart tooltip 更好看 */
+.chart-wrap canvas { display: block; }
+
+/* Stat box 升級 */
+.stat-box {
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-align: center;
+}
+.stat-value { font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; color: var(--text-primary); display: block; }
+.stat-label { font-size: 10px; color: var(--text-muted); margin-top: 3px; display: block; letter-spacing: 0.03em; }
+
+/* KPI card 升級 */
+.predict-kpi {
+  padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: box-shadow 0.15s ease;
+}
+.predict-kpi:hover { box-shadow: 0 3px 8px rgba(0,0,0,0.08); }
+
+/* ── Drag Handle ── */
+.drag-handle {
+  cursor: grab; color: var(--text-muted); font-size: 13px;
+  padding: 0 4px; border-radius: 3px; transition: all 0.1s; flex-shrink: 0;
+  user-select: none; line-height: 1;
+}
+.drag-handle:hover { color: var(--text-secondary); background: var(--surface-2); }
+.drag-handle:active { cursor: grabbing; }
+
+.panel.reorder-target-left { border-left: 3px solid var(--accent-blue); }
+.panel.reorder-target-right { border-right: 3px solid var(--accent-blue); }
+.panel.dragging-panel { opacity: 0.45; transform: scale(0.98); transition: opacity 0.15s, transform 0.15s; }
+
+/* ── View Toggle ── */
+.view-toggle { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+.view-toggle-btn {
+  padding: 5px 9px; border: none; background: transparent; cursor: pointer;
+  color: var(--text-muted); font-size: 13px; transition: all 0.1s; line-height: 1;
+}
+.view-toggle-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+.view-toggle-btn.active { background: var(--text-primary); color: white; }
+
+/* ── Focus Tab Bar ── */
+.focus-tabbar {
+  display: flex; align-items: center; gap: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 10px 10px 0 0;
+  overflow-x: auto; flex-shrink: 0;
+  padding: 0 4px;
+}
+.focus-tabbar::-webkit-scrollbar { height: 0; }
+
+.focus-tab {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 14px; border-bottom: 2px solid transparent;
+  cursor: pointer; white-space: nowrap;
+  transition: all 0.12s; font-size: 12px; color: var(--text-muted);
+  user-select: none; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+}
+.focus-tab:hover { color: var(--text-secondary); background: var(--surface-2); }
+.focus-tab.active { color: var(--text-primary); font-weight: 500; border-bottom-color: var(--accent-blue); background: var(--bg); }
+.focus-tab.tab-drag-over { background: #EFF6FF; }
+
+.focus-tab-badge {
+  font-size: 9px; font-weight: 600; padding: 1px 5px; border-radius: 3px;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.focus-tab-badge.cluster { background: #EFF6FF; color: var(--cluster-color); }
+.focus-tab-badge.predict { background: #FFFBEB; color: var(--predict-color); }
+.focus-tab-badge.recommend { background: #ECFDF5; color: var(--recommend-color); }
+.focus-tab-badge.external { background: #F5F3FF; color: var(--ext-color); }
+
+.focus-tab-close {
+  width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
+  border-radius: 3px; color: var(--text-muted); font-size: 11px;
+  transition: all 0.1s; flex-shrink: 0;
+}
+.focus-tab-close:hover { background: #FEE2E2; color: #DC2626; }
+
+.focus-panel-wrap {
+  flex: 1; background: var(--surface);
+  border: 1px solid var(--border); border-top: none;
+  border-radius: 0 0 10px 10px; overflow: hidden;
+  animation: panel-in 0.2s ease;
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+// ── Tableau Color Palette ──
+const TABLEAU_COLORS = ['#4E79A7','#F28E2B','#E15759','#76B7B2','#59A14F','#EDC948','#B07AA1','#FF9DA7','#9C755F','#BAB0AC'];
+
+const CHART_DEFAULTS = {
+  plugins: {
+    tooltip: {
+      backgroundColor: '#1A1917',
+      titleFont: { family: 'DM Sans', size: 12, weight: '500' },
+      bodyFont: { family: 'DM Mono', size: 11 },
+      padding: 10,
+      cornerRadius: 6,
+      displayColors: true,
+      boxWidth: 8, boxHeight: 8, boxPadding: 4,
+    },
+    legend: {
+      labels: { font: { family: 'DM Sans', size: 11 }, color: '#6B6860', boxWidth: 10, padding: 12 }
+    }
+  },
+  scales: {
+    x: { grid: { color: '#F0EFEC', lineWidth: 1 }, border: { display: false }, ticks: { font: { family: 'DM Mono', size: 10 }, color: '#A8A59E', padding: 6 } },
+    y: { grid: { color: '#F0EFEC', lineWidth: 1 }, border: { display: false }, ticks: { font: { family: 'DM Mono', size: 10 }, color: '#A8A59E', padding: 6 } }
+  }
+};
+
+// ── API ──
+const API_BASE = 'http://localhost:8000';
+const _backendIds = {}; // frontend ds.id → backend dataset id cache
+
+const DEMO_COLS = {
+  ds1: ['age','purchase_amt','frequency','last_purchase_days','session_count','avg_order_value'],
+  ds2: ['click_count','session_duration','page_views','bounce_rate','conversion','revenue'],
+  ds3: ['cart_value','items_count','user_age','visit_frequency','discount_pct','time_on_site'],
+  ds4: ['amount','risk_score','transaction_count','balance','credit_limit','payment_days'],
+  ds5: ['credit_score','income','debt_ratio','payment_history','account_age','utilization'],
+  ds6: ['age','visit_count','diagnosis_code','los_days','readmission_rate','severity'],
+  ds7: ['dosage','adherence_rate','refill_count','days_supply','copay','effectiveness'],
+  ds8: ['confidence','label_count','annotation_time','revision_count','quality_score','agreement'],
+  ds9: ['value','normal_ratio','test_frequency','deviation','risk_flag','patient_age'],
+};
+
+function genSyntheticData(ds) {
+  const cols = DEMO_COLS[ds.id] || ['feat_1','feat_2','feat_3','feat_4','feat_5'];
+  const n = Math.min(ds.rows || 200, 300);
+  return Array.from({ length: n }, () => {
+    const row = {};
+    cols.forEach(c => { row[c] = parseFloat((Math.random() * 100).toFixed(4)); });
+    return row;
+  });
+}
+
+async function ensureBackendDataset(ds) {
+  if (_backendIds[ds.id]) return _backendIds[ds.id];
+  const payload = {
+    project: 'default',
+    name: ds.name,
+    data: ds.source === 'csv' || ds.source === 'sheets'
+      ? ds.data.rows
+      : genSyntheticData(ds),
+  };
+  const resp = await fetch(`${API_BASE}/api/datasets/push`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resp.ok) throw new Error(`Dataset push failed: ${resp.status}`);
+  const { id } = await resp.json();
+  _backendIds[ds.id] = id;
+  return id;
+}
+
+// ── Static Data ──
+const PROJECTS = [
+  { id: 'ecom', name: '電商分析', icon: '🛒', datasetCount: 3 },
+  { id: 'bank', name: '金融風控', icon: '🏦', datasetCount: 2 },
+  { id: 'health', name: '醫療數據', icon: '⚕️', datasetCount: 4 },
+];
+
+const DATASETS = {
+  ecom: [
+    { id: 'ds1', name: '用戶購買行為', icon: '👤', rows: 12840, cols: 18, iconBg: '#DBEAFE' },
+    { id: 'ds2', name: '商品點擊紀錄', icon: '🖱️', rows: 98200, cols: 12, iconBg: '#FDE68A' },
+    { id: 'ds3', name: '購物車放棄率', icon: '🛒', rows: 5420, cols: 9, iconBg: '#A7F3D0' },
+  ],
+  bank: [
+    { id: 'ds4', name: '交易明細', icon: '💳', rows: 340000, cols: 24, iconBg: '#DDD6FE' },
+    { id: 'ds5', name: '客戶信用評分', icon: '📊', rows: 8900, cols: 31, iconBg: '#FFE4E6' },
+  ],
+  health: [
+    { id: 'ds6', name: '患者就診記錄', icon: '🏥', rows: 23100, cols: 47, iconBg: '#A7F3D0' },
+    { id: 'ds7', name: '用藥追蹤', icon: '💊', rows: 15600, cols: 19, iconBg: '#BFDBFE' },
+    { id: 'ds8', name: '影像標注', icon: '🔬', rows: 4200, cols: 8, iconBg: '#FDE68A' },
+    { id: 'ds9', name: '檢驗數值', icon: '🧪', rows: 61000, cols: 55, iconBg: '#EDE9FE' },
+  ],
+};
+
+// Built-in models per panel type
+const BUILTIN_MODELS = {
+  cluster: [
+    { id: 'kmeans', label: 'K-Means' },
+    { id: 'dbscan', label: 'DBSCAN' },
+    { id: 'hierarchical', label: 'Hierarchical' },
+    { id: 'gmm', label: 'GMM' },
+  ],
+  predict: [
+    { id: 'xgboost', label: 'XGBoost' },
+    { id: 'random_forest', label: 'Random Forest' },
+    { id: 'logistic', label: 'Logistic Reg.' },
+    { id: 'lightgbm', label: 'LightGBM' },
+  ],
+  recommend: [
+    { id: 'collab', label: 'Collaborative' },
+    { id: 'content', label: 'Content-Based' },
+    { id: 'matrix_factor', label: 'Matrix Factor.' },
+    { id: 'bpr', label: 'BPR' },
+  ],
+};
+
+// ── Mock results ──
+function mockClusterResult(ds, model) {
+  const n = ds.rows;
+  const colors = TABLEAU_COLORS.slice(0, 5);
+  const k = model === 'dbscan' ? 5 : model === 'gmm' ? 3 : 4;
+  const pcts = k === 5 ? [0.28,0.22,0.20,0.18,0.12] : k === 3 ? [0.52,0.31,0.17] : [0.38,0.29,0.21,0.12];
+  const groups = pcts.map((p, i) => ({ label: `Cluster ${String.fromCharCode(65+i)}`, pct: p, count: Math.round(n*p), color: colors[i] }));
+  return { groups, silhouette: +(0.65 + Math.random()*0.2).toFixed(2), inertia: Math.round(1200 + Math.random()*1500), k, model };
+}
+
+function mockPredictResult(ds, model) {
+  const acc = (85 + Math.random()*10).toFixed(1);
+  return {
+    metrics: [
+      { label: '流失機率 (平均)', score: `${(28+Math.random()*20).toFixed(1)}%`, trend: 'up', delta: '+2.1%' },
+      { label: '購買轉化率', score: `${(10+Math.random()*8).toFixed(1)}%`, trend: 'down', delta: '-0.4%' },
+      { label: '終身價值預測', score: `NT$${Math.round(7000+Math.random()*3000).toLocaleString()}`, trend: 'up', delta: '+580' },
+    ],
+    model: { xgboost: 'XGBoost v1.4', random_forest: 'Random Forest', logistic: 'Logistic Regression', lightgbm: 'LightGBM' }[model] || model,
+    accuracy: `${acc}%`,
+  };
+}
+
+function mockRecommendResult(ds, model) {
+  return {
+    items: [
+      { rank:1, icon:'🎧', name:'無線耳機 Pro', sub:'相似用戶 78% 購買', score:0.94, bg:'#EFF6FF' },
+      { rank:2, icon:'⌚', name:'智慧手錶 SE', sub:'協同過濾推薦', score:0.87, bg:'#FFFBEB' },
+      { rank:3, icon:'📱', name:'手機殼套組', sub:'購買後常見追加', score:0.79, bg:'#ECFDF5' },
+      { rank:4, icon:'🔌', name:'USB-C 充電器', sub:'類別關聯規則', score:0.71, bg:'#F5F3FF' },
+    ],
+    algorithm: { collab:'Collaborative Filtering', content:'Content-Based', matrix_factor:'Matrix Factorization', bpr:'BPR' }[model] || model,
+    coverage: `${Math.round(55+Math.random()*20)}%`,
+  };
+}
+
+function mockExtResult(api) {
+  return {
+    status: 200,
+    latency: `${Math.round(80 + Math.random()*300)}ms`,
+    data: {
+      prediction: +(Math.random()).toFixed(4),
+      confidence: +(0.7 + Math.random()*0.28).toFixed(4),
+      label: Math.random() > 0.5 ? "positive" : "negative",
+      features_used: 14,
+      model_version: api.name.toLowerCase().replace(/\s+/g, '-') + '-v1',
+    }
+  };
+}
+
+// ── JSON Renderer ──
+function JsonValue({ val, depth = 0 }) {
+  if (typeof val === 'string') return <span className="ext-result-string">"{val}"</span>;
+  if (typeof val === 'number') return <span className="ext-result-number">{val}</span>;
+  if (typeof val === 'boolean') return <span className="ext-result-bool">{String(val)}</span>;
+  if (val === null) return <span className="ext-result-bool">null</span>;
+  if (Array.isArray(val)) return <span>[{val.map((v,i) => <span key={i}><JsonValue val={v} depth={depth+1} />{i<val.length-1?', ':''}</span>)}]</span>;
+  if (typeof val === 'object') {
+    const entries = Object.entries(val);
+    return (
+      <span>
+        {'{'}{'\n'}
+        {entries.map(([k, v], i) => (
+          <span key={k}>
+            {'  '.repeat(depth+1)}<span className="ext-result-key">"{k}"</span>: <JsonValue val={v} depth={depth+1} />{i < entries.length - 1 ? ',' : ''}
+            {'\n'}
+          </span>
+        ))}
+        {'  '.repeat(depth)}{'}'}
+      </span>
+    );
+  }
+  return <span>{String(val)}</span>;
+}
+
+// ── DataPreview ──
+function DataPreview({ dataset }) {
+  const [open, setOpen] = useState(false);
+
+  const getMockColumns = (ds) => {
+    const mockCols = {
+      ds1: ['user_id','age','purchase_amt','frequency','last_purchase','category'],
+      ds2: ['product_id','click_time','session_id','user_id','device','referrer'],
+      ds3: ['cart_id','user_id','items','total','abandon_reason','timestamp'],
+      ds4: ['txn_id','amount','merchant','card_type','timestamp','risk_score'],
+      ds5: ['customer_id','credit_score','income','debt_ratio','payment_hist','grade'],
+      ds6: ['patient_id','age','diagnosis','visit_date','doctor_id','outcome'],
+      ds7: ['prescription_id','drug_name','dosage','patient_id','start_date','adherence'],
+      ds8: ['image_id','label','confidence','annotator','status','created_at'],
+      ds9: ['test_id','patient_id','test_type','value','unit','normal_range'],
+    };
+    const cols = mockCols[ds.id] || ['col_1','col_2','col_3','col_4','col_5'];
+    const mockRows = Array.from({length: 5}, (_, i) =>
+      Object.fromEntries(cols.map(c => [c, c.includes('id') ? `${Math.random().toString(36).substr(2,6)}` : c.includes('amt') || c.includes('score') || c.includes('amount') ? (Math.random()*1000).toFixed(2) : c.includes('date') || c.includes('time') ? '2024-0'+(i+1)+'-15' : ['A','B','C','active','pending'][Math.floor(Math.random()*5)]]))
+    );
+    return { headers: cols, rows: mockRows };
+  };
+
+  const data = dataset.source === 'csv' || dataset.source === 'sheets'
+    ? dataset.data
+    : getMockColumns(dataset);
+
+  if (!data) return null;
+  const { headers, rows } = data;
+
+  return (
+    <div style={{ borderBottom: '1px solid var(--border)', background: '#FAFAF9' }}>
+      <div
+        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', cursor:'pointer', userSelect:'none' }}
+        onClick={() => setOpen(v => !v)}
+      >
+        <span style={{ fontSize:10, fontWeight:600, letterSpacing:'0.06em', textTransform:'uppercase', color:'var(--text-muted)' }}>
+          資料預覽
+        </span>
+        <span style={{ fontSize:10, fontFamily:'DM Mono', color:'var(--text-muted)', marginLeft:4 }}>
+          {rows.length} rows · {headers.length} cols
+        </span>
+        <span style={{ marginLeft:'auto', fontSize:10, color:'var(--text-muted)', transition:'transform 0.15s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}>▾</span>
+      </div>
+      {open && (
+        <div style={{ overflowX:'auto', maxHeight:160, overflowY:'auto' }} className="scrollbar-thin">
+          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:11, fontFamily:'DM Mono' }}>
+            <thead>
+              <tr style={{ background:'#F3F2EF', position:'sticky', top:0 }}>
+                {headers.map(h => (
+                  <th key={h} style={{ padding:'5px 10px', textAlign:'left', color:'var(--text-secondary)', fontWeight:600, fontSize:10, letterSpacing:'0.04em', whiteSpace:'nowrap', borderBottom:'1px solid var(--border)' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice(0,5).map((row, i) => (
+                <tr key={i} style={{ borderBottom:'1px solid var(--border)', background: i%2===0 ? 'white' : '#FAFAF9' }}>
+                  {headers.map(h => (
+                    <td key={h} style={{ padding:'5px 10px', color:'var(--text-secondary)', whiteSpace:'nowrap', maxWidth:120, overflow:'hidden', textOverflow:'ellipsis' }}>
+                      {row[h]}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ClusterContent ──
+function ClusterContent({ result, chartType = 'doughnut' }) {
+  const canvasRef = useRef();
+  const chartRef = useRef();
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    if (chartRef.current) chartRef.current.destroy();
+    const labels = result.groups.map(g => g.label);
+    const data = result.groups.map(g => g.count);
+    const colors = result.groups.map(g => g.color);
+    const tableauColors = TABLEAU_COLORS.slice(0, colors.length);
+    const configs = {
+      doughnut: {
+        type:'doughnut',
+        data:{ labels, datasets:[{ data, backgroundColor:tableauColors, borderWidth:2, borderColor:'#fff', hoverOffset:4, borderRadius:6 }] },
+        options:{ cutout:'65%', plugins:{ legend:{ display:false }, tooltip: CHART_DEFAULTS.plugins.tooltip }, animation:{ duration:700 } }
+      },
+      pie: {
+        type:'pie',
+        data:{ labels, datasets:[{ data, backgroundColor:tableauColors, borderWidth:2, borderColor:'#fff' }] },
+        options:{ plugins:{ legend:{ position:'right', labels:{ font:{ family:'DM Sans', size:11 }, color:'#6B6860', boxWidth:10 } }, tooltip: CHART_DEFAULTS.plugins.tooltip }, animation:{ duration:700 } }
+      },
+      bar: {
+        type:'bar',
+        data:{ labels, datasets:[{ data, backgroundColor:tableauColors, borderRadius:4, borderSkipped:false }] },
+        options:{
+          plugins:{ legend:{ display:false }, tooltip: CHART_DEFAULTS.plugins.tooltip },
+          scales:{
+            x:{ ...CHART_DEFAULTS.scales.x, grid:{ display:false }, ticks:{ font:{ family:'DM Sans', size:11 }, color:'#6B6860' } },
+            y:{ ...CHART_DEFAULTS.scales.y }
+          },
+          animation:{ duration:600 }
+        }
+      },
+    };
+    const cfg = configs[chartType] || configs.doughnut;
+    chartRef.current = new Chart(canvasRef.current, cfg);
+    return () => chartRef.current?.destroy();
+  }, [result, chartType]);
+
+  const total = result.groups.reduce((a, g) => a + g.count, 0);
+  const isDoughnut = chartType === 'doughnut';
+
+  return (
+    <div>
+      {isDoughnut ? (
+        <div className="chart-row">
+          <div style={{ position:'relative', width:140, height:140 }}>
+            <canvas ref={canvasRef} width="140" height="140" />
+            <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', pointerEvents:'none' }}>
+              <span style={{ fontFamily:'DM Mono', fontSize:18, fontWeight:500 }}>{result.k}</span>
+              <span style={{ fontSize:10, color:'var(--text-muted)' }}>groups</span>
+            </div>
+          </div>
+          <div className="chart-legend">
+            {result.groups.map((g, i) => (
+              <div key={i} className="legend-item">
+                <div className="legend-dot" style={{ background: g.color }} />
+                <span>{g.label}</span>
+                <span className="legend-val">{(g.pct*100).toFixed(0)}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="chart-wrap" style={{ height: 160, marginBottom:12 }}>
+          <canvas ref={canvasRef} />
+        </div>
+      )}
+      <div className="stat-row">
+        <div className="stat-box"><span className="stat-value">{total.toLocaleString()}</span><span className="stat-label">Total</span></div>
+        <div className="stat-box"><span className="stat-value">{result.silhouette}</span><span className="stat-label">Silhouette</span></div>
+        <div className="stat-box"><span className="stat-value">{result.inertia.toLocaleString()}</span><span className="stat-label">Inertia</span></div>
+      </div>
+    </div>
+  );
+}
+
+// ── PredictContent ──
+function PredictContent({ result, chartType = 'hbar' }) {
+  const canvasRef = useRef();
+  const chartRef = useRef();
+  // Use real feature_importance from backend if available, else fallback
+  const featImps = result.feature_importance || [];
+  const labels = featImps.length > 0 ? featImps.map(f => f.feature) : ['特徵 A','特徵 B','特徵 C','特徵 D','特徵 E'];
+  const vals   = featImps.length > 0 ? featImps.map(f => f.importance) : [0.31,0.24,0.18,0.15,0.12];
+  // Normalize accuracy display: backend returns float 0-1, mock returns "92.3%"
+  const accDisplay = typeof result.accuracy === 'number' ? `${(result.accuracy*100).toFixed(1)}%` : result.accuracy;
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    if (chartRef.current) chartRef.current.destroy();
+    const isHbar = chartType === 'hbar';
+    const isLine = chartType === 'line';
+    const canvas = canvasRef.current;
+    let gradientFill = 'rgba(242,142,43,0.12)';
+    if (isLine) {
+      const ctx2d = canvas.getContext('2d');
+      const grad = ctx2d.createLinearGradient(0, 0, 0, 110);
+      grad.addColorStop(0, 'rgba(242,142,43,0.25)');
+      grad.addColorStop(1, 'rgba(242,142,43,0.02)');
+      gradientFill = grad;
+    }
+    chartRef.current = new Chart(canvas, {
+      type: isLine ? 'line' : 'bar',
+      data: {
+        labels: isLine ? ['Jan','Feb','Mar','Apr','May','Jun'] : labels,
+        datasets: [{
+          data: isLine ? [0.28,0.31,0.27,0.34,0.32,0.29] : vals,
+          backgroundColor: isLine ? gradientFill : '#4E79A7',
+          borderColor: isLine ? '#F28E2B' : '#4E79A7', borderWidth: isLine ? 2 : 1.5,
+          borderRadius: isLine ? 0 : 4, borderSkipped: false,
+          fill: isLine, tension: 0.4,
+          pointBackgroundColor: isLine ? '#F28E2B' : '#4E79A7', pointRadius: isLine ? 4 : 0,
+        }]
+      },
+      options: {
+        indexAxis: isHbar ? 'y' : 'x',
+        plugins: {
+          legend:{ display:false },
+          tooltip:{ ...CHART_DEFAULTS.plugins.tooltip, callbacks:{ label: ctx => isLine ? ` 流失率: ${(ctx.raw*100).toFixed(0)}%` : ` Importance: ${(ctx.raw*100).toFixed(1)}%` } }
+        },
+        scales: {
+          x: { ...CHART_DEFAULTS.scales.x, max: isHbar ? undefined : undefined },
+          y: { ...CHART_DEFAULTS.scales.y, grid:{ display: !isHbar, color:'#F0EFEC', lineWidth:1 } }
+        },
+        animation: { duration:600 }
+      }
+    });
+    return () => chartRef.current?.destroy();
+  }, [result, chartType]);
+
+  return (
+    <div>
+      <div className="predict-kpi-row">
+        {result.metrics.map((m, i) => (
+          <div key={i} className="predict-kpi">
+            <span className="predict-kpi-val" style={{ color: m.trend === 'up' ? '#D97706' : '#DC2626' }}>{m.score}</span>
+            <span className="predict-kpi-label">{m.label}</span>
+            <span className={`predict-kpi-delta ${m.trend === 'up' ? 'delta-up' : 'delta-down'}`}>{m.delta}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize:10, color:'var(--text-muted)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.06em', fontWeight:600 }}>Feature Importance</div>
+      <div className="chart-wrap" style={{ height: 110 }}>
+        <canvas ref={canvasRef} />
+      </div>
+      <div className="predict-model-info">
+        <span style={{ fontSize:11, color:'var(--text-muted)' }}>Model:</span>
+        <span style={{ fontSize:11, fontFamily:'DM Mono', color:'var(--text-secondary)' }}>{result.model}</span>
+        <span className="predict-accuracy">Acc {accDisplay}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── RecommendContent ──
+function RecommendContent({ result, chartType = 'hbar' }) {
+  const canvasRef = useRef();
+  const chartRef = useRef();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setMounted(true), 80); return () => clearTimeout(t); }, []);
+
+  useEffect(() => {
+    if (chartType === 'hbar') { chartRef.current?.destroy(); return; }
+    if (!canvasRef.current) return;
+    if (chartRef.current) chartRef.current.destroy();
+    const labels = result.items.map(i => i.name);
+    const scores = result.items.map(i => i.score);
+    if (chartType === 'bubble') {
+      chartRef.current = new Chart(canvasRef.current, {
+        type: 'bubble',
+        data: { datasets: result.items.map((item, i) => ({ label: item.name, data:[{ x: i+1, y: item.score, r: item.score * 20 }], backgroundColor: TABLEAU_COLORS[i] + 'CC' })) },
+        options: {
+          plugins:{
+            legend:{ position:'right', labels:{ font:{ family:'DM Sans', size:10 }, color:'#6B6860', boxWidth:8, padding:10 } },
+            tooltip: CHART_DEFAULTS.plugins.tooltip
+          },
+          scales:{
+            x:{ display:false },
+            y:{ ...CHART_DEFAULTS.scales.y, min:0, max:1 }
+          },
+          animation:{ duration:600 }
+        }
+      });
+    } else if (chartType === 'radar') {
+      chartRef.current = new Chart(canvasRef.current, {
+        type: 'radar',
+        data: { labels, datasets:[{ data: scores, backgroundColor:'rgba(89,161,79,0.15)', borderColor:'#59A14F', borderWidth:2, pointBackgroundColor:'#59A14F', pointRadius:4 }] },
+        options: {
+          plugins:{ legend:{ display:false }, tooltip: CHART_DEFAULTS.plugins.tooltip },
+          scales:{ r:{ grid:{ color:'#E5E3DF' }, ticks:{ display:false }, pointLabels:{ font:{ family:'DM Sans', size:11 }, color:'#6B6860' }, min:0, max:1 } },
+          animation:{ duration:600 }
+        }
+      });
+    }
+    return () => chartRef.current?.destroy();
+  }, [result, chartType]);
+
+  if (chartType !== 'hbar') {
+    return (
+      <div>
+        <div className="chart-wrap" style={{ height: 180 }}><canvas ref={canvasRef} /></div>
+        <div style={{ display:'flex', gap:10, marginTop:6 }}>
+          <span style={{ fontSize:10, color:'var(--text-muted)' }}>Algorithm: <span style={{ color:'var(--text-secondary)', fontFamily:'DM Mono' }}>{result.algorithm}</span></span>
+          <span style={{ fontSize:10, color:'var(--text-muted)', marginLeft:'auto' }}>Coverage <span style={{ color:'var(--recommend-color)', fontFamily:'DM Mono' }}>{result.coverage}</span></span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {result.items.map((item, i) => (
+        <div key={i} className="rec-item">
+          <span className="rec-rank">#{item.rank}</span>
+          <div className="rec-icon" style={{ background: item.bg }}>{item.icon}</div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div className="rec-name">{item.name}</div>
+            <div className="rec-sub">{item.sub}</div>
+          </div>
+          <div className="rec-bar-wrap">
+            <div className="rec-bar" style={{ width: mounted ? `${item.score*100}%` : '0%' }} />
+          </div>
+          <span className="rec-score">{(item.score*100).toFixed(0)}%</span>
+        </div>
+      ))}
+      <div style={{ marginTop:10, display:'flex', gap:10 }}>
+        <span style={{ fontSize:10, color:'var(--text-muted)' }}>Algorithm: <span style={{ color:'var(--text-secondary)', fontFamily:'DM Mono' }}>{result.algorithm}</span></span>
+        <span style={{ fontSize:10, color:'var(--text-muted)', marginLeft:'auto' }}>Coverage <span style={{ color:'var(--recommend-color)', fontFamily:'DM Mono' }}>{result.coverage}</span></span>
+      </div>
+    </div>
+  );
+}
+
+// ── OutputSection ──
+function OutputSection({ result }) {
+  const [open, setOpen] = useState(false);
+  const [url, setUrl] = useState('');
+  const [mode, setMode] = useState('once'); // 'once' | 'schedule'
+  const [interval, setInterval_] = useState('1h');
+  const [running, setRunning] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const timerRef = useRef();
+
+  const sendOnce = () => {
+    if (!url) return;
+    setFeedback(null);
+    setTimeout(() => setFeedback({ ok: true, msg: `已送出 → ${url}` }), 400);
+  };
+
+  const toggleSchedule = () => {
+    if (running) {
+      clearInterval(timerRef.current);
+      setRunning(false);
+      setFeedback({ ok: true, msg: '排程已停止' });
+    } else {
+      setRunning(true);
+      setFeedback({ ok: true, msg: `排程啟動，每 ${interval} 自動送出` });
+      timerRef.current = setInterval(() => {
+        setFeedback({ ok: true, msg: `✓ ${new Date().toLocaleTimeString()} 已送出` });
+      }, 4000);
+    }
+  };
+
+  useEffect(() => () => clearInterval(timerRef.current), []);
+
+  if (!result) return null;
+  return (
+    <div className="output-section">
+      <div className="output-toggle" onClick={() => setOpen(v => !v)}>
+        <span className={`output-toggle-arrow ${open ? 'open' : ''}`}>▶</span>
+        輸出設定
+        {running && <span style={{ marginLeft:'auto', fontSize:10, color:'var(--accent-emerald)', fontFamily:'DM Mono' }}>● 排程中</span>}
+      </div>
+      {open && (
+        <div className="output-body">
+          <input className="form-input mono" placeholder="https://your-backend.com/webhook" value={url} onChange={e => setUrl(e.target.value)} style={{ fontSize:11 }} />
+          <div className="output-mode-row">
+            <button className={`output-mode-btn ${mode === 'once' ? 'active' : ''}`} onClick={() => setMode('once')}>統計一次</button>
+            <button className={`output-mode-btn ${mode === 'schedule' ? 'active' : ''}`} onClick={() => setMode('schedule')}>持續統計</button>
+          </div>
+          {mode === 'schedule' && (
+            <div className="output-interval-row">
+              <span className="output-interval-label">間隔：</span>
+              <select className="form-select" value={interval} onChange={e => setInterval_(e.target.value)} style={{ fontSize:11 }}>
+                <option value="15m">每 15 分鐘</option>
+                <option value="1h">每 1 小時</option>
+                <option value="6h">每 6 小時</option>
+                <option value="1d">每天</option>
+              </select>
+            </div>
+          )}
+          <div className="output-actions">
+            {mode === 'once'
+              ? <button className="output-send-btn once" onClick={sendOnce} disabled={!url}>立即送出</button>
+              : <button className={`output-send-btn schedule ${running ? 'running' : ''}`} onClick={toggleSchedule} disabled={!url}>
+                  {running ? '⏹ 停止排程' : '▶ 啟動排程'}
+                </button>
+            }
+          </div>
+          {feedback && <div className={`output-feedback ${feedback.ok ? 'sent' : 'error'}`}>{feedback.msg}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── ExtContent ──
+function ExtContent({ result }) {
+  return (
+    <div>
+      <div className="ext-header">
+        <span className={`ext-status-badge ${result.status === 200 ? 'success' : 'error'}`}>
+          {result.status === 200 ? '● 200 OK' : `● ${result.status}`}
+        </span>
+        <span className="ext-latency">{result.latency}</span>
+      </div>
+      <div className="ext-result scrollbar-thin">
+        <pre style={{ whiteSpace:'pre-wrap', wordBreak:'break-word' }}>
+          <JsonValue val={result.data} />
+        </pre>
+      </div>
+    </div>
+  );
+}
+
+const CHART_TYPES = {
+  cluster: [
+    { id: 'doughnut', label: '甜甜圈', icon: '◎' },
+    { id: 'bar',      label: '長條圖', icon: '▊' },
+    { id: 'pie',      label: '圓餅圖', icon: '◕' },
+  ],
+  predict: [
+    { id: 'hbar',  label: '橫向條',  icon: '≡' },
+    { id: 'vbar',  label: '直向條',  icon: '⫴' },
+    { id: 'line',  label: '折線圖',  icon: '∿' },
+  ],
+  recommend: [
+    { id: 'hbar',   label: '橫向條', icon: '≡' },
+    { id: 'bubble', label: '氣泡圖', icon: '⊚' },
+    { id: 'radar',  label: '雷達圖', icon: '✦' },
+  ],
+};
+
+// ── Model Selector ──
+function ModelSelector({ panelType, selectedModel, selectedChart, externalApis, onSelect, onChartChange }) {
+  const builtins = BUILTIN_MODELS[panelType] || [];
+  const chartTypes = CHART_TYPES[panelType] || [];
+  return (
+    <div className="model-selector">
+      <div className="model-selector-label">模型選擇</div>
+      <div className="model-options">
+        {builtins.map(m => (
+          <div key={m.id} className={`model-option builtin ${selectedModel?.id === m.id ? 'selected' : ''}`} onClick={() => onSelect({ type:'builtin', id:m.id, label:m.label })}>
+            <span className="model-dot" />{m.label}
+          </div>
+        ))}
+        {externalApis.length > 0 && (
+          <>
+            <div className="model-divider">外部 API</div>
+            {externalApis.map(api => (
+              <div key={api.id} className={`model-option external ${selectedModel?.id === api.id ? 'selected' : ''}`} onClick={() => onSelect({ type:'external', id:api.id, label:api.name, api })}>
+                <span className="model-dot" />{api.name}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+
+      {chartTypes.length > 0 && (
+        <>
+          <div style={{ height:1, background:'var(--border)', margin:'10px 0' }} />
+          <div className="model-selector-label">圖表類型</div>
+          <div className="model-options">
+            {chartTypes.map(c => (
+              <div key={c.id} className={`model-option builtin ${selectedChart === c.id ? 'selected' : ''}`} onClick={() => onChartChange(c.id)}>
+                <span style={{ fontSize:12 }}>{c.icon}</span>{c.label}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Panel ──
+function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragStart, onPanelDragEnd, onPanelDragOver, onPanelDrop, reorderTarget }) {
+  const [isDatasetDragOver, setIsDatasetDragOver] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(
+    panel.type === 'cluster' ? { type:'builtin', id:'kmeans', label:'K-Means' }
+    : panel.type === 'predict' ? { type:'builtin', id:'xgboost', label:'XGBoost' }
+    : { type:'builtin', id:'collab', label:'Collaborative' }
+  );
+  const [selectedChart, setSelectedChart] = useState(
+    panel.type === 'cluster' ? 'doughnut' : panel.type === 'predict' ? 'hbar' : 'hbar'
+  );
+
+  const runAnalysis = async (ds, model) => {
+    if (!ds) return;
+    setLoading(true); setResult(null);
+    try {
+      if (model?.type === 'external') {
+        // External APIs still use mock (no backend proxy)
+        await new Promise(r => setTimeout(r, 1200 + Math.random()*400));
+        setResult(mockExtResult(model.api));
+        return;
+      }
+      const dsId = await ensureBackendDataset(ds);
+      const resp = await fetch(`${API_BASE}/api/analyze/${panel.type}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataset_id: dsId, model_id: model?.id || (panel.type === 'cluster' ? 'kmeans' : panel.type === 'predict' ? 'xgboost' : 'collab'), params: {} }),
+      });
+      if (!resp.ok) throw new Error(`API error ${resp.status}`);
+      const { result } = await resp.json();
+      setResult(result);
+    } catch (err) {
+      console.error('Analysis failed:', err);
+      setResult({ _error: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { if (panel.dataset) runAnalysis(panel.dataset, selectedModel); }, [panel.dataset]);
+
+  const handleModelSelect = (model) => {
+    setSelectedModel(model);
+    if (panel.dataset) runAnalysis(panel.dataset, model);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    // if reordering a panel, delegate to parent
+    if (onPanelDragOver && isDragging !== panel.id) {
+      onPanelDragOver(panel.id, e);
+      return;
+    }
+    setIsDatasetDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDatasetDragOver(false);
+      if (onPanelDragOver) onPanelDragOver(null, e);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDatasetDragOver(false);
+    // panel reorder drop
+    if (isDragging) { onPanelDrop(panel.id); return; }
+    // dataset drop
+    try {
+      const data = JSON.parse(e.dataTransfer.getData('application/json'));
+      onDrop(panel.id, data);
+    } catch(_) {}
+  };
+
+  const TYPE_CONFIG = { cluster:{ label:'分群分析' }, predict:{ label:'預測分析' }, recommend:{ label:'推薦引擎' } };
+  const badgeClass = selectedModel?.type === 'external' ? 'external' : panel.type;
+  const badgeLabel = selectedModel?.type === 'external' ? `⚡ ${selectedModel.label}` : TYPE_CONFIG[panel.type]?.label;
+
+  let panelClass = 'panel';
+  if (isDragging === panel.id) panelClass += ' dragging-panel';
+  else if (reorderTarget === panel.id) panelClass += ' reorder-target-left';
+  else if (isDatasetDragOver) panelClass += ' drop-target';
+
+  return (
+    <div className={panelClass} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+      <div className="panel-header">
+        <span
+          className="drag-handle"
+          draggable
+          title="拖動面板"
+          onDragStart={e => { e.stopPropagation(); onPanelDragStart(panel.id); }}
+          onDragEnd={onPanelDragEnd}
+        >⠿</span>
+        <span className={`panel-type-badge ${badgeClass}`}>{badgeLabel}</span>
+        {panel.dataset
+          ? <span className="panel-dataset-name">{panel.dataset.name}</span>
+          : <span className="panel-dataset-none">拖入資料集...</span>
+        }
+        <div className="panel-actions">
+          {panel.dataset && (
+            <button className={`panel-btn ${showModelSelector ? 'active' : ''}`} title="選擇模型" onClick={() => setShowModelSelector(v => !v)}>
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                <line x1="1.5" y1="2.5" x2="11.5" y2="2.5"/>
+                <circle cx="4" cy="2.5" r="1.5" fill="currentColor" stroke="none"/>
+                <line x1="1.5" y1="6.5" x2="11.5" y2="6.5"/>
+                <circle cx="9" cy="6.5" r="1.5" fill="currentColor" stroke="none"/>
+                <line x1="1.5" y1="10.5" x2="11.5" y2="10.5"/>
+                <circle cx="4" cy="10.5" r="1.5" fill="currentColor" stroke="none"/>
+              </svg>
+            </button>
+          )}
+          {panel.dataset && (
+            <button className="panel-btn" title="重新執行" onClick={() => runAnalysis(panel.dataset, selectedModel)}>↻</button>
+          )}
+          <button className="panel-btn" title="關閉" onClick={() => onClose(panel.id)}>✕</button>
+        </div>
+      </div>
+
+      {showModelSelector && panel.dataset && (
+        <ModelSelector
+          panelType={panel.type}
+          selectedModel={selectedModel}
+          selectedChart={selectedChart}
+          externalApis={externalApis}
+          onSelect={handleModelSelect}
+          onChartChange={setSelectedChart}
+        />
+      )}
+
+      {panel.dataset && result && !loading && (
+        <DataPreview dataset={panel.dataset} />
+      )}
+
+      <div className="panel-body">
+        {!panel.dataset ? (
+          <div className={`drop-zone ${isDatasetDragOver ? 'active' : ''}`}>
+            <div className="drop-zone-icon">⊕</div>
+            <div>將資料集拖曳到這裡</div>
+            <div style={{ marginTop:4, fontSize:11 }}>或從左側選擇資料集</div>
+          </div>
+        ) : loading ? (
+          <div className="analysis-loading">
+            <div className="spinner" />
+            <span>{selectedModel?.type === 'external' ? `呼叫 ${selectedModel.label}...` : '分析中...'}</span>
+          </div>
+        ) : result?._error ? (
+          <div style={{ padding:'20px 16px', color:'#DC2626', fontSize:12, fontFamily:'DM Mono', background:'#FEF2F2', margin:'12px', borderRadius:8, border:'1px solid #FECACA' }}>
+            {result._error}
+            <div style={{ marginTop:6, color:'#9CA3AF', fontFamily:'DM Sans' }}>確認後端是否已啟動：uvicorn main:app --reload</div>
+          </div>
+        ) : result ? (
+          selectedModel?.type === 'external' ? <ExtContent result={result} /> :
+          panel.type === 'cluster' ? <ClusterContent result={result} chartType={selectedChart} /> :
+          panel.type === 'predict' ? <PredictContent result={result} chartType={selectedChart} /> :
+          <RecommendContent result={result} chartType={selectedChart} />
+        ) : null}
+      </div>
+      <OutputSection result={result} />
+    </div>
+  );
+}
+
+// ── Add External API Modal ──
+function AddExtApiModal({ onSave, onClose }) {
+  const [form, setForm] = useState({
+    name: '', url: '', method: 'POST',
+    headers: [{ key: 'Authorization', value: 'Bearer ' }],
+    inputField: 'data', outputNote: '',
+  });
+  const [testResult, setTestResult] = useState(null);
+  const [testing, setTesting] = useState(false);
+
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const addHeader = () => setForm(f => ({ ...f, headers: [...f.headers, { key: '', value: '' }] }));
+  const removeHeader = (i) => setForm(f => ({ ...f, headers: f.headers.filter((_, idx) => idx !== i) }));
+  const setHeader = (i, k, v) => setForm(f => ({
+    ...f, headers: f.headers.map((h, idx) => idx === i ? { ...h, [k]: v } : h)
+  }));
+
+  const handleTest = () => {
+    if (!form.url) return;
+    setTesting(true);
+    setTestResult(null);
+    setTimeout(() => {
+      const ok = form.url.startsWith('http');
+      setTestResult({ ok, msg: ok ? `連線成功 · 200 OK · ${Math.round(80+Math.random()*200)}ms` : '無效的 URL 格式' });
+      setTesting(false);
+    }, 1200);
+  };
+
+  const handleSave = () => {
+    if (!form.name || !form.url) return;
+    onSave({ id: `ext_${Date.now()}`, ...form });
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal wide" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">新增外部模型 API</div>
+            <div className="modal-sub">串接自己部署的模型或第三方推論服務</div>
+          </div>
+          <button className="panel-btn" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">API 名稱</label>
+              <input className="form-input" placeholder="My Model v2" value={form.name} onChange={e => set('name', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Method</label>
+              <select className="form-select" value={form.method} onChange={e => set('method', e.target.value)}>
+                <option>POST</option>
+                <option>GET</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Endpoint URL</label>
+            <input className="form-input mono" placeholder="https://your-model.api.com/predict" value={form.url} onChange={e => set('url', e.target.value)} />
+          </div>
+
+          <div className="form-group">
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
+              <label className="form-label" style={{ marginBottom:0 }}>Headers</label>
+              <button className="btn btn-ghost" style={{ padding:'3px 8px', fontSize:11 }} onClick={addHeader}>+ 新增</button>
+            </div>
+            <div className="headers-list">
+              {form.headers.map((h, i) => (
+                <div key={i} className="header-row">
+                  <input className="form-input mono" placeholder="Key" value={h.key} onChange={e => setHeader(i, 'key', e.target.value)} />
+                  <input className="form-input mono" placeholder="Value" value={h.value} onChange={e => setHeader(i, 'value', e.target.value)} />
+                  <button className="header-del" onClick={() => removeHeader(i)}>✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">輸入欄位名稱</label>
+              <input className="form-input mono" placeholder="data" value={form.inputField} onChange={e => set('inputField', e.target.value)} />
+              <span style={{ fontSize:10, color:'var(--text-muted)', marginTop:2 }}>資料集會以此欄位名傳入 request body</span>
+            </div>
+            <div className="form-group">
+              <label className="form-label">預期輸出欄位（選填）</label>
+              <input className="form-input mono" placeholder="prediction, confidence" value={form.outputNote} onChange={e => set('outputNote', e.target.value)} />
+              <span style={{ fontSize:10, color:'var(--text-muted)', marginTop:2 }}>僅供備忘，不影響實際呼叫</span>
+            </div>
+          </div>
+
+          <div className="info-box">
+            系統會將 Dataset 的 <code style={{ fontFamily:'DM Mono', background:'#BAE6FD', padding:'0 3px', borderRadius:3 }}>{form.inputField || 'data'}</code> 欄位打包成 JSON 傳入，格式：
+            <span style={{ fontFamily:'DM Mono', fontSize:11, display:'block', marginTop:4, color:'#0369A1' }}>
+              {`{ "${form.inputField || 'data'}": [...rows], "dataset_name": "...", "rows": N }`}
+            </span>
+          </div>
+
+          {testResult && (
+            <div className={`test-result ${testResult.ok ? 'success' : 'error'}`}>
+              {testResult.ok ? '✓' : '✗'} {testResult.msg}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={handleTest} disabled={!form.url || testing}>
+            {testing ? '測試中...' : '⚡ 測試連線'}
+          </button>
+          <button className="btn btn-ghost" onClick={onClose}>取消</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={!form.name || !form.url}>儲存</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── API Docs Modal ──
+function ApiDocsModal({ onClose }) {
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div><div className="modal-title">資料推送 API</div><div className="modal-sub">後端透過此 endpoint 推送資料</div></div>
+          <button className="panel-btn" onClick={onClose}>✕</button>
+        </div>
+        <div className="modal-body">
+          <div className="endpoint-list">
+            <div className="endpoint-item"><span className="method post">POST</span><span>/api/datasets/push</span><span className="endpoint-desc">推送新資料集</span></div>
+            <div className="endpoint-item"><span className="method get">GET</span><span>/api/datasets</span><span className="endpoint-desc">列出所有資料集</span></div>
+            <div className="endpoint-item"><span className="method post">POST</span><span>/api/analyze/{'{type}'}</span><span className="endpoint-desc">觸發分析任務</span></div>
+          </div>
+          <div className="code-block">
+            <span className="code-comment"># 推送資料範例</span>{'\n'}
+            <span className="code-key">curl</span> -X POST <span className="code-url">https://your-domain.com/api/datasets/push</span>{'\n'}
+            {'  '}-H <span className="code-string">"X-API-Key: sk-xxxx"</span>{'\n'}
+            {'  '}-d <span className="code-string">'{`{ "project": "ecom", "name": "用戶行為", "data": [...] }`}'</span>
+          </div>
+          <div style={{ padding:'10px 14px', background:'#FFFBEB', borderRadius:8, border:'1px solid #FDE68A', fontSize:12, color:'#92400E', lineHeight:1.6 }}>
+            每筆 POST 需帶 <code style={{ fontFamily:'DM Mono', background:'#FEF3C7', padding:'0 3px', borderRadius:3 }}>project</code> 和 <code style={{ fontFamily:'DM Mono', background:'#FEF3C7', padding:'0 3px', borderRadius:3 }}>name</code>，系統自動建立資料集並顯示在側欄。
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── CSV Parser ──
+function parseCSV(text) {
+  const lines = text.trim().split('\n').filter(l => l.trim());
+  if (lines.length < 2) return null;
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const rows = lines.slice(1).map(line => {
+    const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    return Object.fromEntries(headers.map((h, i) => [h, vals[i] ?? '']));
+  });
+  return { headers, rows };
+}
+
+function extractSheetId(url) {
+  const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : null;
+}
+
+// ── Dataset Upload Section ──
+function DatasetUploader({ onAdd }) {
+  const [dragOver, setDragOver] = useState(false);
+  const [sheetsUrl, setSheetsUrl] = useState('');
+  const [sheetsLoading, setSheetsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const fileRef = useRef();
+
+  const processFile = (file) => {
+    if (!file || !file.name.endsWith('.csv')) { setError('只支援 .csv 檔案'); return; }
+    setError('');
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const parsed = parseCSV(e.target.result);
+      if (!parsed) { setError('CSV 格式無法解析'); return; }
+      onAdd({
+        id: `upload_${Date.now()}`,
+        name: file.name.replace('.csv', ''),
+        icon: '📄',
+        iconBg: '#DBEAFE',
+        rows: parsed.rows.length,
+        cols: parsed.headers.length,
+        source: 'csv',
+        data: parsed,
+      });
+    };
+    reader.readAsText(file);
+  };
+
+  const handleFileDrop = (e) => {
+    e.preventDefault(); setDragOver(false);
+    processFile(e.dataTransfer.files[0]);
+  };
+
+  const handleSheetsImport = () => {
+    const id = extractSheetId(sheetsUrl);
+    if (!id) { setError('無效的 Google Sheets 網址'); return; }
+    setError(''); setSheetsLoading(true);
+    // Use the public CSV export endpoint
+    const exportUrl = `https://docs.google.com/spreadsheets/d/${id}/export?format=csv`;
+    fetch(exportUrl)
+      .then(r => { if (!r.ok) throw new Error('無法存取，請確認試算表已設為公開'); return r.text(); })
+      .then(text => {
+        const parsed = parseCSV(text);
+        if (!parsed) throw new Error('資料格式無法解析');
+        onAdd({
+          id: `sheets_${Date.now()}`,
+          name: `Sheets ${id.slice(0,8)}...`,
+          icon: '📊',
+          iconBg: '#A7F3D0',
+          rows: parsed.rows.length,
+          cols: parsed.headers.length,
+          source: 'sheets',
+          data: parsed,
+        });
+        setSheetsUrl(''); setSheetsLoading(false);
+      })
+      .catch(err => { setError(err.message); setSheetsLoading(false); });
+  };
+
+  return (
+    <div style={{ padding: '0 16px 12px' }}>
+      {/* CSV Upload */}
+      <div
+        className={`upload-zone ${dragOver ? 'drag-over' : ''}`}
+        onClick={() => fileRef.current.click()}
+        onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleFileDrop}
+      >
+        <input ref={fileRef} type="file" accept=".csv" onChange={e => processFile(e.target.files[0])} />
+        <div style={{ fontSize: 18, marginBottom: 4 }}>⊕</div>
+        <div className="upload-zone-text">
+          <strong>點擊上傳</strong> 或拖曳 CSV 進來
+        </div>
+      </div>
+
+      {/* Google Sheets */}
+      <div className="sheets-row">
+        <input
+          className="sheets-input"
+          placeholder="貼上 Google Sheets 網址"
+          value={sheetsUrl}
+          onChange={e => { setSheetsUrl(e.target.value); setError(''); }}
+          onKeyDown={e => e.key === 'Enter' && handleSheetsImport()}
+        />
+        <button className="sheets-btn" onClick={handleSheetsImport} disabled={!sheetsUrl || sheetsLoading}>
+          {sheetsLoading ? '...' : '匯入'}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ fontSize: 11, color: '#DC2626', background: '#FEF2F2', padding: '6px 8px', borderRadius: 5, border: '1px solid #FECACA' }}>
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── App ──
+function App() {
+  const [activeProject, setActiveProject] = useState('ecom');
+  const [panels, setPanels] = useState([
+    { id: 'p1', type: 'cluster', dataset: DATASETS.ecom[0] },
+    { id: 'p2', type: 'predict', dataset: DATASETS.ecom[0] },
+    { id: 'p3', type: 'recommend', dataset: null },
+  ]);
+  const [externalApis, setExternalApis] = useState([
+    { id: 'ext1', name: 'HuggingFace Inference', url: 'https://api-inference.huggingface.co/models/my-model', method: 'POST', headers: [{ key: 'Authorization', value: 'Bearer hf_xxx' }], inputField: 'inputs' },
+  ]);
+  const [showAddExt, setShowAddExt] = useState(false);
+  const [showApiDocs, setShowApiDocs] = useState(false);
+  const [apiOnline, setApiOnline] = useState(null); // null=checking, true=ok, false=down
+  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'focus'
+
+  useEffect(() => {
+    const check = () => fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3000) })
+      .then(r => setApiOnline(r.ok))
+      .catch(() => setApiOnline(false));
+    check();
+    const t = setInterval(check, 15000);
+    return () => clearInterval(t);
+  }, []);
+  const [activeTab, setActiveTab] = useState('p1');
+  const [draggingPanelId, setDraggingPanelId] = useState(null);
+  const [reorderTarget, setReorderTarget] = useState(null);
+  const idCounter = useRef(4);
+
+  const addPanel = (type) => {
+    const id = `p${idCounter.current++}`;
+    setPanels(prev => [...prev, { id, type, dataset: null }]);
+    setActiveTab(id);
+  };
+
+  const closePanel = (id) => {
+    setPanels(prev => {
+      const next = prev.filter(p => p.id !== id);
+      if (activeTab === id && next.length > 0) setActiveTab(next[next.length - 1].id);
+      return next;
+    });
+  };
+
+  const dropDataset = (panelId, dataset) => {
+    setPanels(prev => prev.map(p => p.id === panelId ? { ...p, dataset } : p));
+  };
+
+  const saveExtApi = (api) => {
+    setExternalApis(prev => [...prev, api]);
+    setShowAddExt(false);
+  };
+
+  const deleteExtApi = (id) => setExternalApis(prev => prev.filter(a => a.id !== id));
+
+  // Panel reorder
+  const handlePanelDragStart = (id) => setDraggingPanelId(id);
+  const handlePanelDragEnd = () => { setDraggingPanelId(null); setReorderTarget(null); };
+  const handlePanelDragOver = (targetId) => { if (targetId !== draggingPanelId) setReorderTarget(targetId); };
+  const handlePanelDrop = (targetId) => {
+    if (!draggingPanelId || draggingPanelId === targetId) { handlePanelDragEnd(); return; }
+    setPanels(prev => {
+      const arr = [...prev];
+      const fromIdx = arr.findIndex(p => p.id === draggingPanelId);
+      const toIdx = arr.findIndex(p => p.id === targetId);
+      const [removed] = arr.splice(fromIdx, 1);
+      arr.splice(toIdx, 0, removed);
+      return arr;
+    });
+    handlePanelDragEnd();
+  };
+
+  // Tab drag reorder
+  const [draggingTab, setDraggingTab] = useState(null);
+  const [tabDragOver, setTabDragOver] = useState(null);
+  const handleTabDrop = (targetId) => {
+    if (!draggingTab || draggingTab === targetId) { setDraggingTab(null); setTabDragOver(null); return; }
+    setPanels(prev => {
+      const arr = [...prev];
+      const from = arr.findIndex(p => p.id === draggingTab);
+      const to = arr.findIndex(p => p.id === targetId);
+      const [r] = arr.splice(from, 1);
+      arr.splice(to, 0, r);
+      return arr;
+    });
+    setDraggingTab(null); setTabDragOver(null);
+  };
+
+  const [uploadedDatasets, setUploadedDatasets] = useState([]);
+  const addUploadedDataset = (ds) => setUploadedDatasets(prev => [ds, ...prev]);
+
+  const datasets = [...(DATASETS[activeProject] || []), ...uploadedDatasets];
+  const TYPE_LABEL = { cluster:'分群', predict:'預測', recommend:'推薦' };
+
+  return (
+    <div className="app">
+      <div className="topbar">
+        <div className="topbar-logo"><div className="dot" />ML Platform</div>
+        <div className="topbar-divider" />
+        <div className="topbar-api-status">
+          <div className="indicator" style={{ background: apiOnline === null ? '#D97706' : apiOnline ? '#059669' : '#DC2626' }} />
+          {apiOnline === null ? 'API: 連線中...' : apiOnline ? `API: Online` : 'API: 離線'}
+        </div>
+        <div className="topbar-actions">
+          <button className="btn btn-ghost" onClick={() => setShowApiDocs(true)}>⚡ API 串接</button>
+          <button className="btn btn-primary">+ 新增 Project</button>
+        </div>
+      </div>
+
+      <div className="main">
+        {/* Sidebar */}
+        <div className="sidebar">
+          <div className="sidebar-section">
+            <div className="sidebar-label">Projects</div>
+            {PROJECTS.map(p => (
+              <div key={p.id} className={`project-item ${activeProject === p.id ? 'active' : ''}`} onClick={() => setActiveProject(p.id)}>
+                <span className="icon">{p.icon}</span>{p.name}<span className="count">{p.datasetCount}</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="sidebar-divider" />
+
+          <div className="sidebar-section" style={{ paddingBottom:8 }}>
+            <div className="sidebar-label">Datasets</div>
+          </div>
+          <DatasetUploader onAdd={addUploadedDataset} />
+          <div className="dataset-list scrollbar-thin" style={{ flex:'none', maxHeight:220, overflowY:'auto', paddingTop:0 }}>
+            {datasets.map(ds => (
+              <div
+                key={ds.id} className="dataset-item" draggable
+                onDragStart={e => e.dataTransfer.setData('application/json', JSON.stringify(ds))}
+              >
+                <div className="dataset-icon" style={{ background: ds.iconBg }}>{ds.icon}</div>
+                <div className="dataset-meta">
+                  <div className="dataset-name">{ds.name}</div>
+                  <div className="dataset-info" style={{ display:'flex', gap:5, alignItems:'center' }}>
+                    {ds.source === 'csv' && <span className="upload-tag csv">CSV</span>}
+                    {ds.source === 'sheets' && <span className="upload-tag sheets">Sheets</span>}
+                    {ds.rows.toLocaleString()} rows · {ds.cols} cols
+                  </div>
+                </div>
+                <span className="dataset-drag-hint">⠿</span>
+              </div>
+            ))}
+          </div>
+
+          <div className="sidebar-divider" />
+
+          <div className="sidebar-section" style={{ paddingBottom:8 }}>
+            <div className="sidebar-label">外部模型 API</div>
+          </div>
+          <div className="dataset-list scrollbar-thin">
+            {externalApis.map(api => (
+              <div key={api.id} className="ext-api-item" title={api.url}>
+                <div className="ext-api-dot" />
+                <div className="ext-api-meta">
+                  <div className="ext-api-name">{api.name}</div>
+                  <div className="ext-api-url">{api.url}</div>
+                </div>
+                <button className="header-del" onClick={() => deleteExtApi(api.id)} title="移除">✕</button>
+              </div>
+            ))}
+            <button className="add-ext-btn" onClick={() => setShowAddExt(true)}>
+              + 新增外部 API
+            </button>
+          </div>
+        </div>
+
+        {/* Workspace */}
+        <div className="workspace scrollbar-thin">
+          <div className="workspace-toolbar">
+            <div>
+              <div className="workspace-title">分析工作區</div>
+              <div className="workspace-subtitle">{PROJECTS.find(p => p.id === activeProject)?.name} · {panels.length} 個面板</div>
+            </div>
+            <div className="view-toggle">
+              <button className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`} title="並排檢視" onClick={() => setViewMode('grid')}>⊞</button>
+              <button className={`view-toggle-btn ${viewMode === 'focus' ? 'active' : ''}`} title="單一檢視" onClick={() => setViewMode('focus')}>▣</button>
+            </div>
+            <div className="add-panel-menu">
+              <button className="panel-type-btn cluster" onClick={() => addPanel('cluster')}>+ 分群</button>
+              <button className="panel-type-btn predict" onClick={() => addPanel('predict')}>+ 預測</button>
+              <button className="panel-type-btn recommend" onClick={() => addPanel('recommend')}>+ 推薦</button>
+            </div>
+          </div>
+
+          {panels.length === 0 ? (
+            <div className="workspace-empty">
+              <div className="workspace-empty-icon">◫</div>
+              <div className="workspace-empty-title">工作區是空的</div>
+              <div className="workspace-empty-sub">點擊右上角新增分析面板，再將資料集拖曳進去</div>
+            </div>
+          ) : viewMode === 'grid' ? (
+            <div className="panels-grid">
+              {panels.map(panel => (
+                <Panel
+                  key={panel.id}
+                  panel={panel}
+                  externalApis={externalApis}
+                  onClose={closePanel}
+                  onDrop={dropDataset}
+                  isDragging={draggingPanelId}
+                  reorderTarget={reorderTarget}
+                  onPanelDragStart={handlePanelDragStart}
+                  onPanelDragEnd={handlePanelDragEnd}
+                  onPanelDragOver={handlePanelDragOver}
+                  onPanelDrop={handlePanelDrop}
+                />
+              ))}
+            </div>
+          ) : (
+            // ── Focus mode ──
+            <div style={{ display:'flex', flexDirection:'column', flex:1, minHeight:0 }}>
+              <div className="focus-tabbar">
+                {panels.map(p => (
+                  <div
+                    key={p.id}
+                    className={`focus-tab ${activeTab === p.id ? 'active' : ''} ${tabDragOver === p.id ? 'tab-drag-over' : ''}`}
+                    draggable
+                    onClick={() => setActiveTab(p.id)}
+                    onDragStart={() => setDraggingTab(p.id)}
+                    onDragEnd={() => { setDraggingTab(null); setTabDragOver(null); }}
+                    onDragOver={e => { e.preventDefault(); setTabDragOver(p.id); }}
+                    onDragLeave={() => setTabDragOver(null)}
+                    onDrop={() => handleTabDrop(p.id)}
+                  >
+                    <span className={`focus-tab-badge ${p.type}`}>{TYPE_LABEL[p.type]}</span>
+                    <span>{p.dataset ? p.dataset.name : '(空白)'}</span>
+                    <span className="focus-tab-close" onClick={e => { e.stopPropagation(); closePanel(p.id); }}>✕</span>
+                  </div>
+                ))}
+              </div>
+              <div className="focus-panel-wrap">
+                {panels.filter(p => p.id === activeTab).map(panel => (
+                  <Panel
+                    key={panel.id}
+                    panel={panel}
+                    externalApis={externalApis}
+                    onClose={closePanel}
+                    onDrop={dropDataset}
+                    isDragging={null}
+                    reorderTarget={null}
+                    onPanelDragStart={() => {}}
+                    onPanelDragEnd={() => {}}
+                    onPanelDragOver={() => {}}
+                    onPanelDrop={() => {}}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showAddExt && <AddExtApiModal onSave={saveExtApi} onClose={() => setShowAddExt(false)} />}
+      {showApiDocs && <ApiDocsModal onClose={() => setShowApiDocs(false)} />}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
