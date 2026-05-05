@@ -2940,18 +2940,26 @@ function DatasetUploader({ onAdd }) {
 // ── App ──
 function App() {
   const [user, setUser] = useState(undefined); // undefined=checking, null=not logged in
+  const devMode = useRef(false);
 
   useEffect(() => {
-    const unsub = auth.onAuthStateChanged(u => setUser(u ?? null));
+    const unsub = auth.onAuthStateChanged(u => {
+      if (!devMode.current) setUser(u ?? null);
+    });
     return () => unsub();
   }, []);
 
+  const handleDevBypass = () => {
+    devMode.current = true;
+    setUser({ email: 'dev@local' });
+  };
+
   if (user === undefined) return null; // still checking
-  if (user === null) return <AuthGate onAuth={setUser} devBypass={() => setUser({ email: 'dev@local' })} />;
-  return <Dashboard user={user} sb={sb} />;
+  if (user === null) return <AuthGate onAuth={setUser} devBypass={handleDevBypass} />;
+  return <Dashboard user={user} />;
 }
 
-function Dashboard({ user, sb }) {
+function Dashboard({ user }) {
   const [activeProject, setActiveProject] = useState('ecom');
   const [panels, setPanels] = useState([
     { id: 'p1', type: 'cluster', dataset: DATASETS.ecom[0] },
