@@ -10,6 +10,9 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -618,6 +621,157 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .panel.reorder-target-right { border-right: 3px solid var(--accent-blue); }
 .panel.dragging-panel { opacity: 0.45; transform: scale(0.98); transition: opacity 0.15s, transform 0.15s; }
 
+/* ── Code Panel ── */
+.code-panel-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+
+.code-editor-area {
+  flex: 1; min-height: 140px; display: flex; position: relative;
+  background: #0F0E14;
+  border-bottom: 1px solid #2A2835;
+}
+
+.code-line-numbers {
+  width: 38px; flex-shrink: 0; padding: 14px 0; text-align: right;
+  font-family: 'DM Mono', monospace; font-size: 11px; line-height: 1.75;
+  color: #3D3A4E; user-select: none; background: #0B0A10;
+  border-right: 1px solid #1E1C28; overflow: hidden;
+}
+
+.code-editor-area textarea {
+  flex: 1; resize: none; border: none; outline: none;
+  padding: 14px 14px 14px 12px;
+  font-family: 'DM Mono', monospace; font-size: 11.5px; line-height: 1.75;
+  background: transparent; color: #D4D0E8; tab-size: 4;
+  overflow-y: auto; white-space: pre; word-wrap: off;
+}
+
+.code-editor-area textarea::placeholder { color: #4A4660; }
+.code-editor-area textarea::selection { background: rgba(99, 85, 199, 0.35); }
+
+.code-toolbar {
+  display: flex; align-items: center; gap: 10px; padding: 7px 12px;
+  background: #16141E; border-bottom: 1px solid #2A2835;
+}
+
+.code-run-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 16px; border-radius: 5px; border: none;
+  background: linear-gradient(135deg, #10B981, #059669);
+  color: white; font-size: 11.5px; font-weight: 600;
+  cursor: pointer; font-family: 'DM Sans', sans-serif;
+  transition: all 0.15s; letter-spacing: 0.01em;
+  box-shadow: 0 1px 4px rgba(5, 150, 105, 0.3);
+}
+.code-run-btn:hover { background: linear-gradient(135deg, #059669, #047857); transform: translateY(-0.5px); box-shadow: 0 2px 8px rgba(5, 150, 105, 0.4); }
+.code-run-btn:active { transform: translateY(0); }
+.code-run-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.code-run-btn .run-icon {
+  width: 0; height: 0; border-left: 6px solid white; border-top: 4px solid transparent; border-bottom: 4px solid transparent;
+  margin-right: 1px;
+}
+
+.code-clear-btn {
+  padding: 4px 10px; border-radius: 4px; border: 1px solid #2A2835;
+  background: transparent; color: #6B6880; font-size: 10px; font-weight: 500;
+  cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.12s;
+}
+.code-clear-btn:hover { border-color: #4A4660; color: #9B97B0; background: rgba(255,255,255,0.03); }
+
+.code-ds-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 8px; border-radius: 3px;
+  font-size: 10px; font-family: 'DM Mono', monospace;
+  background: rgba(99, 85, 199, 0.15); color: #A78BFA;
+  border: 1px solid rgba(99, 85, 199, 0.2);
+}
+
+.code-latency-tag {
+  margin-left: auto; font-size: 10px; font-family: 'DM Mono', monospace; color: #4A4660;
+}
+
+.code-output-area {
+  flex: 0 1 auto; min-height: 60px; max-height: 50%; overflow-y: auto;
+  background: #FAFAF8; padding: 0;
+  transition: max-height 0.2s ease;
+}
+
+.code-output-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 14px;
+  background: var(--surface-2); border-bottom: 1px solid var(--border);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--text-muted);
+  position: sticky; top: 0; z-index: 1;
+}
+
+.code-output-status {
+  width: 6px; height: 6px; border-radius: 50%;
+}
+.code-output-status.ok { background: #10B981; }
+.code-output-status.err { background: #EF4444; }
+.code-output-status.idle { background: var(--border-strong); }
+
+.code-output-body { padding: 12px 14px; font-family: 'DM Mono', monospace; font-size: 11px; line-height: 1.65; }
+
+.code-output-body .code-stdout { color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
+.code-output-body .code-error-block {
+  color: #DC2626; background: #FEF2F2; padding: 10px 12px; border-radius: 6px;
+  border: 1px solid #FECACA; margin-bottom: 8px; white-space: pre-wrap; word-break: break-word;
+  font-size: 10.5px; line-height: 1.6;
+}
+
+.code-output-body .code-result-label {
+  font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted); margin: 8px 0 4px; display: block;
+}
+
+.code-result-df {
+  width: 100%; border-collapse: collapse; margin-top: 4px;
+}
+.code-result-df th {
+  text-align: left; padding: 5px 10px; font-size: 10px; font-weight: 600;
+  color: var(--text-muted); border-bottom: 2px solid var(--border);
+  background: var(--surface); position: sticky; top: 0; letter-spacing: 0.02em;
+}
+.code-result-df td {
+  padding: 4px 10px; font-size: 11px; border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.code-result-df tr:hover td { background: rgba(37, 99, 235, 0.03); }
+.code-result-df .df-shape {
+  font-size: 10px; color: var(--text-muted); padding: 6px 10px; font-style: italic;
+}
+
+.code-result-json {
+  background: #1E1B2E; border-radius: 6px; padding: 10px 12px;
+  color: #C4B5FD; font-size: 11px; line-height: 1.6; overflow-x: auto;
+  max-height: 180px; overflow-y: auto;
+}
+
+.code-empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 30px 20px; color: #4A4660;
+}
+.code-empty-state .code-empty-icon { font-size: 24px; opacity: 0.4; }
+.code-empty-state .code-empty-text { font-size: 11px; text-align: center; line-height: 1.5; color: var(--text-muted); }
+
+/* Code panel colors in system */
+.panel-type-badge.code { background: #0F0E14; color: #10B981; }
+.panel-type-btn.code {
+  border: 1px solid #A7F3D0; color: #059669; background: #ECFDF5;
+  border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer;
+  font-family: 'DM Mono', monospace; font-weight: 500;
+  transition: all 0.12s;
+}
+.panel-type-btn.code:hover { background: #D1FAE5; }
+.focus-tab-badge.code { background: #0F0E14; color: #10B981; }
+
+@keyframes code-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 /* ── View Toggle ── */
 .view-toggle { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 .view-toggle-btn {
@@ -672,12 +826,259 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   border-radius: 0 0 10px 10px; overflow: hidden;
   animation: panel-in 0.2s ease;
 }
+
+/* ── Auth ── */
+.auth-overlay {
+  position: fixed; inset: 0; background: var(--bg);
+  display: flex; flex-direction: column; z-index: 999;
+}
+.auth-topbar {
+  height: var(--header-h); background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 20px;
+  flex-shrink: 0;
+}
+.auth-topbar-logo {
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px;
+  letter-spacing: -0.02em; display: flex; align-items: center; gap: 8px;
+}
+.auth-topbar-logo .dot {
+  width: 8px; height: 8px; background: var(--accent-blue);
+  border-radius: 50%; animation: pulse 2s ease-in-out infinite;
+}
+.auth-body {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+}
+.auth-card {
+  width: 380px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; overflow: hidden;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.06);
+}
+.auth-card-header {
+  padding: 20px 24px 18px; border-bottom: 1px solid var(--border);
+}
+.auth-card-title {
+  font-family: 'Syne', sans-serif; font-weight: 700; font-size: 16px;
+  letter-spacing: -0.01em; color: var(--text-primary);
+}
+.auth-card-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.auth-card-body { padding: 20px 24px 24px; display: flex; flex-direction: column; gap: 14px; }
+.auth-field { display: flex; flex-direction: column; gap: 5px; }
+.auth-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); letter-spacing: 0.02em; }
+.auth-input {
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none;
+  background: var(--surface); color: var(--text-primary);
+  transition: border-color 0.15s;
+}
+.auth-input:focus { border-color: var(--accent-blue); }
+.auth-btn {
+  width: 100%; padding: 8px 12px; border: none; border-radius: 6px;
+  background: var(--text-primary); color: white; font-size: 12px; font-weight: 500;
+  cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.auth-btn:hover:not(:disabled) { background: #333; }
+.auth-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.auth-toggle { text-align: center; font-size: 12px; color: var(--text-muted); }
+.auth-toggle span { color: var(--accent-blue); cursor: pointer; font-weight: 500; }
+.auth-toggle span:hover { text-decoration: underline; }
+.auth-error { font-size: 11px; color: #DC2626; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 6px; padding: 8px 10px; }
+.auth-success { font-size: 11px; color: #059669; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 6px; padding: 8px 10px; }
+.auth-user { display: flex; align-items: center; gap: 8px; }
+.auth-user-email { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-muted); }
+.auth-signout { padding: 4px 10px; border: 1px solid var(--border); border-radius: 5px; background: transparent; cursor: pointer; font-size: 11px; color: var(--text-muted); font-family: 'DM Sans', sans-serif; }
+.auth-signout:hover { background: var(--surface-2); color: var(--text-primary); }
+
+/* ── Mode Toggle (day/night pill) ── */
+.mode-toggle-wrap { padding: 10px 12px 2px; display: flex; justify-content: center; }
+.mode-pill {
+  position: relative; display: flex; align-items: center;
+  width: 148px; height: 28px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 14px; cursor: pointer; user-select: none;
+  transition: border-color 0.2s;
+}
+.mode-pill:hover { border-color: var(--border-strong); }
+.mode-pill-thumb {
+  position: absolute; top: 2px; left: 2px;
+  width: 70px; height: 22px; border-radius: 11px;
+  background: var(--surface); box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  transition: transform 0.22s cubic-bezier(0.4,0,0.2,1);
+  pointer-events: none;
+}
+.mode-pill.expert .mode-pill-thumb { transform: translateX(72px); }
+.mode-pill-label {
+  position: relative; z-index: 1; flex: 1; text-align: center;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.03em;
+  transition: color 0.18s; pointer-events: none;
+}
+.mode-pill .mode-pill-label.left  { color: var(--text-primary); }
+.mode-pill .mode-pill-label.right { color: var(--text-muted); }
+.mode-pill.expert .mode-pill-label.left  { color: var(--text-muted); }
+.mode-pill.expert .mode-pill-label.right { color: var(--text-primary); }
+
+/* ── Param Controls ── */
+.param-controls { padding: 8px 12px 10px; border-top: 1px solid var(--border); }
+.param-controls-empty { padding: 8px 12px; font-size: 11px; color: var(--text-muted); border-top: 1px solid var(--border); }
+.param-row { margin-bottom: 9px; }
+.param-row:last-child { margin-bottom: 0; }
+.param-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.param-label-text { font-size: 11px; color: var(--text-secondary); font-weight: 500; }
+.param-label-code { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--text-muted); }
+.param-value-tag { font-size: 11px; font-family: 'DM Mono', monospace; color: var(--accent-blue); font-weight: 600; min-width: 38px; text-align: right; }
+.param-slider-wrap { display: flex; align-items: center; gap: 6px; }
+.param-slider { -webkit-appearance: none; flex: 1; height: 3px; border-radius: 2px; background: var(--border); outline: none; cursor: pointer; }
+.param-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%; background: var(--accent-blue); cursor: pointer; border: 2px solid white; box-shadow: 0 1px 4px rgba(37,99,235,0.35); }
+.param-tip { font-size: 10px; color: var(--text-muted); margin-top: 3px; line-height: 1.45; }
+.param-auto-run { font-size: 10px; color: var(--accent-emerald); margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+
+/* ── Level Selector (簡單模式) ── */
+.level-selector { display: flex; margin: 8px 12px 10px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.level-btn { flex: 1; padding: 9px 4px 7px; border: none; background: transparent; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s, color 0.15s; border-right: 1px solid var(--border); }
+.level-btn:last-child { border-right: none; }
+.level-btn:hover:not(.active) { background: var(--surface-2); }
+.level-btn.active { background: var(--text-primary); }
+.level-btn-label { font-size: 12px; font-weight: 700; display: block; color: var(--text-muted); transition: color 0.15s; }
+.level-btn-desc  { font-size: 9px; display: block; margin-top: 2px; color: var(--text-muted); transition: color 0.15s; line-height: 1.3; }
+.level-btn.active .level-btn-label { color: white; }
+.level-btn.active .level-btn-desc  { color: rgba(255,255,255,0.65); }
+
+/* ── Settings Panel ── */
+.settings-panel { border-top: 1px solid var(--border); padding: 10px 12px; background: var(--surface); }
+.settings-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.settings-row:last-child { margin-bottom: 0; }
+.settings-label { font-size: 11px; font-weight: 600; color: var(--text-secondary); min-width: 56px; }
+.settings-split-input { display: flex; align-items: center; gap: 4px; }
+.settings-split-input input { width: 48px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 5px; font-family: 'DM Mono', monospace; font-size: 12px; text-align: center; outline: none; }
+.settings-split-input input:focus { border-color: var(--accent-blue); }
+.settings-split-input span { font-size: 11px; color: var(--text-muted); }
+.settings-hint { font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+.settings-feat-actions { display: flex; gap: 4px; margin-left: auto; }
+.settings-feat-btn { padding: 2px 7px; font-size: 10px; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; color: var(--text-muted); font-family: 'DM Sans', sans-serif; }
+.settings-feat-btn:hover { background: var(--surface-2); color: var(--text-primary); }
+.feature-checkboxes { display: flex; flex-wrap: wrap; gap: 4px 6px; margin-top: 4px; }
+.feature-checkbox { display: flex; align-items: center; gap: 4px; font-size: 11px; font-family: 'DM Mono', monospace; color: var(--text-secondary); cursor: pointer; padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--surface); transition: all 0.1s; }
+.feature-checkbox:hover { border-color: var(--border-strong); }
+.feature-checkbox input { accent-color: var(--accent-blue); cursor: pointer; }
+.feature-checkbox.checked { border-color: var(--accent-blue); background: #EFF6FF; color: var(--accent-blue); }
+
+/* ── Compare Panel ── */
+.compare-panel { border-top: 1px solid var(--border); padding: 10px 12px; }
+.compare-model-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); }
+.compare-model-name { font-size: 11px; font-weight: 600; color: var(--text-secondary); min-width: 80px; }
+.compare-params { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
+.compare-param { display: flex; flex-direction: column; align-items: center; gap: 1px; }
+.compare-param label { font-size: 9px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+.compare-param input { width: 54px; padding: 3px 5px; border: 1px solid var(--border); border-radius: 4px; font-family: 'DM Mono', monospace; font-size: 11px; text-align: center; outline: none; }
+.compare-param input:focus { border-color: var(--accent-blue); }
+.compare-run-btn { width: 100%; padding: 8px; border: none; border-radius: 6px; background: var(--text-primary); color: white; font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; margin-top: 4px; }
+.compare-run-btn:hover:not(:disabled) { background: #333; }
+.compare-run-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Compare Results ── */
+.compare-results { padding: 0 4px; }
+.compare-result-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; margin-bottom: 6px; border: 1px solid var(--border); background: var(--surface); }
+.compare-result-row.best { border-color: var(--accent-emerald); background: #F0FDF4; }
+.compare-rank { font-size: 13px; font-weight: 700; color: var(--text-muted); min-width: 20px; }
+.compare-result-row.best .compare-rank { color: var(--accent-emerald); }
+.compare-result-model { font-size: 11px; font-weight: 600; color: var(--text-primary); min-width: 90px; }
+.compare-metrics { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
+.compare-metric { font-size: 10px; font-family: 'DM Mono', monospace; background: var(--surface-2); padding: 2px 6px; border-radius: 3px; color: var(--text-secondary); }
+.compare-metric.highlight { background: #DCFCE7; color: #15803D; font-weight: 600; }
+.compare-error { font-size: 10px; color: #DC2626; font-family: 'DM Mono', monospace; }
+.compare-best-badge { font-size: 9px; font-weight: 700; background: var(--accent-emerald); color: white; padding: 1px 5px; border-radius: 3px; letter-spacing: 0.04em; }
+
+/* ── Run History ── */
+.run-history { border-top: 1px solid var(--border); background: var(--surface); }
+.run-history-header { display: flex; align-items: center; gap: 6px; padding: 7px 12px; cursor: pointer; user-select: none; }
+.run-history-header:hover { background: var(--surface-2); }
+.run-history-title { font-size: 11px; font-weight: 600; color: var(--text-secondary); flex: 1; }
+.run-history-count { font-size: 10px; font-family: 'DM Mono', monospace; background: var(--surface-2); padding: 1px 6px; border-radius: 3px; color: var(--text-muted); }
+.run-history-export { font-size: 10px; padding: 2px 7px; border: 1px solid var(--border); border-radius: 4px; background: transparent; cursor: pointer; color: var(--text-muted); font-family: 'DM Sans', sans-serif; }
+.run-history-export:hover { background: var(--surface-2); color: var(--text-primary); }
+.run-history-chevron { font-size: 10px; color: var(--text-muted); transition: transform 0.15s; }
+.run-history-chevron.open { transform: rotate(180deg); }
+.run-history-list { max-height: 220px; overflow-y: auto; border-top: 1px solid var(--border); }
+.run-row { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-bottom: 1px solid var(--border); transition: background 0.1s; }
+.run-row:last-child { border-bottom: none; }
+.run-row:hover { background: var(--surface-2); }
+.run-row.pinned { background: #FFFBEB; }
+.run-num { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--text-muted); min-width: 24px; }
+.run-model { font-size: 11px; font-weight: 500; color: var(--text-primary); min-width: 80px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.run-metrics { display: flex; gap: 4px; flex: 1; flex-wrap: wrap; }
+.run-metric-tag { font-size: 10px; font-family: 'DM Mono', monospace; background: var(--surface-2); padding: 1px 5px; border-radius: 3px; color: var(--text-secondary); }
+.run-metric-tag.f1 { background: #EFF6FF; color: var(--accent-blue); font-weight: 600; }
+.run-metric-tag.best { background: #DCFCE7; color: #15803D; font-weight: 600; }
+.run-time { font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace; white-space: nowrap; }
+.run-actions { display: flex; gap: 3px; }
+.run-action-btn { padding: 2px 6px; font-size: 10px; border: 1px solid var(--border); border-radius: 3px; background: transparent; cursor: pointer; color: var(--text-muted); font-family: 'DM Sans', sans-serif; transition: all 0.1s; white-space: nowrap; }
+.run-action-btn:hover { background: var(--text-primary); color: white; border-color: var(--text-primary); }
+.run-action-btn.pin-active { background: #FFFBEB; border-color: #FCD34D; color: #D97706; }
+.run-empty { padding: 16px; text-align: center; font-size: 11px; color: var(--text-muted); }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
 const { useState, useEffect, useRef } = React;
+
+// ── Firebase ──
+const firebaseApp = firebase.initializeApp({
+  apiKey: "AIzaSyAqZwqt3R7k1xsSMFJOA_n86vveddXiw6c",
+  authDomain: "ctbc-proto-2026.firebaseapp.com",
+  projectId: "ctbc-proto-2026",
+  storageBucket: "ctbc-proto-2026.firebasestorage.app",
+  messagingSenderId: "1055821818468",
+  appId: "1:1055821818468:web:87caa0494f2257bb5bcd71",
+});
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+async function sbSaveRun(panelType, datasetName, run) {
+  const user = auth.currentUser;
+  if (!user) return null;
+  const doc = await db.collection('run_history').add({
+    user_id: user.uid,
+    panel_type: panelType,
+    dataset_name: datasetName,
+    model_id: run.modelId,
+    model_name: run.modelName,
+    params: run.params,
+    metrics: run.metrics,
+    test_split: run.testSplit,
+    features: run.features,
+    pinned: false,
+    created_at: firebase.firestore.FieldValue.serverTimestamp(),
+  });
+  return doc.id;
+}
+
+async function sbTogglePin(id, pinned) {
+  await db.collection('run_history').doc(id).update({ pinned });
+}
+
+async function sbLoadRuns(panelType) {
+  const snap = await db.collection('run_history')
+    .where('panel_type', '==', panelType)
+    .orderBy('created_at', 'asc')
+    .get();
+  return snap.docs.map(d => {
+    const r = d.data();
+    return {
+      id: d.id,
+      ts: r.created_at?.toMillis?.() || Date.now(),
+      modelId: r.model_id,
+      modelName: r.model_name,
+      params: r.params || {},
+      metrics: r.metrics || {},
+      testSplit: r.test_split || 20,
+      features: r.features || [],
+      pinned: r.pinned || false,
+      datasetName: r.dataset_name,
+    };
+  });
+}
 
 // ── Tableau Color Palette ──
 const TABLEAU_COLORS = ['#4E79A7','#F28E2B','#E15759','#76B7B2','#59A14F','#EDC948','#B07AA1','#FF9DA7','#9C755F','#BAB0AC'];
@@ -704,7 +1105,9 @@ const CHART_DEFAULTS = {
 };
 
 // ── API ──
-const API_BASE = 'http://localhost:8000';
+const API_BASE = window.location.hostname === 'localhost' || window.location.protocol === 'file:'
+  ? 'http://localhost:8000'
+  : window.location.origin;
 const _backendIds = {}; // frontend ds.id → backend dataset id cache
 
 const DEMO_COLS = {
@@ -795,6 +1198,83 @@ const BUILTIN_MODELS = {
     { id: 'bpr', label: 'BPR' },
   ],
 };
+
+// ── Parameter Schema ──
+// expertOnly: true = 只在專家模式顯示; beginnerTip = 新手說明
+const PARAM_SCHEMA = {
+  cluster: {
+    kmeans:      [{ key:'k',           label:'分群數',   code:'n_clusters',    type:'slider', min:2, max:12,   step:1,    def:4,   tip:'資料要切成幾堆？數字越大分越細' }],
+    dbscan:      [
+      { key:'eps',        label:'鄰域範圍', code:'epsilon',       type:'slider', min:0.1, max:3.0, step:0.05, def:0.5, tip:'點距多近才算同一群？越小分群越多' },
+      { key:'min_samples',label:'最少點數', code:'min_samples',   type:'slider', min:2,  max:20,  step:1,    def:5,   tip:'每個群的最低成員數', expertOnly:true },
+    ],
+    hierarchical:[{ key:'k',           label:'分群數',   code:'n_clusters',    type:'slider', min:2, max:12,   step:1,    def:4,   tip:'由上往下切幾個群？' }],
+    gmm:         [{ key:'k',           label:'分佈數',   code:'n_components',  type:'slider', min:2, max:10,   step:1,    def:3,   tip:'假設資料由幾個高斯分佈組成' }],
+  },
+  predict: {
+    xgboost: [
+      { key:'n_estimators',label:'樹的數量', code:'n_estimators',  type:'slider', min:10, max:500, step:10,   def:100, tip:'更多棵樹通常更準，但訓練變慢' },
+      { key:'max_depth',   label:'樹的深度', code:'max_depth',     type:'slider', min:1,  max:10,  step:1,    def:4,   tip:'每棵樹最多幾層？太深容易過擬合', expertOnly:true },
+      { key:'learning_rate',label:'學習速率',code:'learning_rate', type:'slider', min:0.01,max:0.5,step:0.01, def:0.1, tip:'每輪更新的步伐大小，越小越穩', expertOnly:true },
+    ],
+    random_forest:[{ key:'n_estimators',label:'樹的數量', code:'n_estimators',  type:'slider', min:10, max:500, step:10,   def:100, tip:'隨機森林中決策樹的數量' }],
+    logistic:    [{ key:'max_iter',    label:'迭代次數', code:'max_iter',      type:'slider', min:100,max:2000,step:100,  def:500, tip:'梯度下降最大迭代輪數，不足就加大', expertOnly:true }],
+    lightgbm:    [{ key:'n_estimators',label:'樹的數量', code:'n_estimators',  type:'slider', min:10, max:500, step:10,   def:100, tip:'Gradient Boosting 的疊代樹數' }],
+  },
+  recommend: {
+    collab:       [{ key:'top_n', label:'推薦數量', code:'top_n', type:'slider', min:2, max:10, step:1, def:4, tip:'一次推薦幾個項目給使用者？' }],
+    content:      [{ key:'top_n', label:'推薦數量', code:'top_n', type:'slider', min:2, max:10, step:1, def:4, tip:'依內容相似度推薦幾個？' }],
+    matrix_factor:[{ key:'top_n', label:'推薦數量', code:'top_n', type:'slider', min:2, max:10, step:1, def:4, tip:'SVD 分解後推薦幾個？' }],
+    bpr:          [{ key:'top_n', label:'推薦數量', code:'top_n', type:'slider', min:2, max:10, step:1, def:4, tip:'Pairwise Ranking 推薦幾個？' }],
+  },
+};
+
+// 簡單模式三段預設：低 / 中 / 高
+const PARAM_PRESETS = {
+  cluster: {
+    kmeans:       { low:{k:2},                              mid:{k:4},                                    high:{k:8} },
+    dbscan:       { low:{eps:1.5, min_samples:3},           mid:{eps:0.5, min_samples:5},                 high:{eps:0.2, min_samples:8} },
+    hierarchical: { low:{k:2},                              mid:{k:4},                                    high:{k:8} },
+    gmm:          { low:{k:2},                              mid:{k:3},                                    high:{k:6} },
+  },
+  predict: {
+    xgboost:      { low:{n_estimators:30,  max_depth:2, learning_rate:0.2}, mid:{n_estimators:100, max_depth:4, learning_rate:0.1}, high:{n_estimators:300, max_depth:6, learning_rate:0.05} },
+    random_forest:{ low:{n_estimators:30},                  mid:{n_estimators:100},                       high:{n_estimators:300} },
+    logistic:     { low:{max_iter:100},                     mid:{max_iter:500},                           high:{max_iter:2000} },
+    lightgbm:     { low:{n_estimators:30},                  mid:{n_estimators:100},                       high:{n_estimators:300} },
+  },
+  recommend: {
+    collab:       { low:{top_n:2}, mid:{top_n:4}, high:{top_n:8} },
+    content:      { low:{top_n:2}, mid:{top_n:4}, high:{top_n:8} },
+    matrix_factor:{ low:{top_n:2}, mid:{top_n:4}, high:{top_n:8} },
+    bpr:          { low:{top_n:2}, mid:{top_n:4}, high:{top_n:8} },
+  },
+};
+
+const LEVEL_META = [
+  { key:'low',  label:'低', desc:'快速\n初探用' },
+  { key:'mid',  label:'中', desc:'平衡\n推薦預設' },
+  { key:'high', label:'高', desc:'精細\n較慢更準' },
+];
+
+function defaultParams(panelType, modelId) {
+  const schema = PARAM_SCHEMA[panelType]?.[modelId] || [];
+  return Object.fromEntries(schema.map(p => [p.key, p.def]));
+}
+
+function getDatasetCols(ds) {
+  if (!ds) return [];
+  if (ds.source === 'csv' || ds.source === 'sheets') {
+    if (ds.data?.columns) return ds.data.columns;
+    if (ds.data?.rows?.[0]) return Object.keys(ds.data.rows[0]);
+  }
+  return DEMO_COLS[ds.id] || [];
+}
+
+function initCompareParams(panelType) {
+  const models = BUILTIN_MODELS[panelType] || [];
+  return Object.fromEntries(models.map(m => [m.id, PARAM_PRESETS[panelType]?.[m.id]?.mid || defaultParams(panelType, m.id)]));
+}
 
 // ── Mock results ──
 function mockClusterResult(ds, model) {
@@ -1218,12 +1698,12 @@ function OutputSection({ result }) {
     <div className="output-section">
       <div className="output-toggle" onClick={() => setOpen(v => !v)}>
         <span className={`output-toggle-arrow ${open ? 'open' : ''}`}>▶</span>
-        輸出設定
-        {running && <span style={{ marginLeft:'auto', fontSize:10, color:'var(--accent-emerald)', fontFamily:'DM Mono' }}>● 排程中</span>}
+        傳送結果到外部系統
+        {running && <span style={{ marginLeft:'auto', fontSize:10, color:'var(--accent-emerald)', fontFamily:'DM Mono' }}>● 傳送中</span>}
       </div>
       {open && (
         <div className="output-body">
-          <input className="form-input mono" placeholder="https://your-backend.com/webhook" value={url} onChange={e => setUrl(e.target.value)} style={{ fontSize:11 }} />
+          <input className="form-input mono" placeholder="貼上你的 Webhook URL，分析結果會以 JSON 格式傳過去" value={url} onChange={e => setUrl(e.target.value)} style={{ fontSize:11 }} />
           <div className="output-mode-row">
             <button className={`output-mode-btn ${mode === 'once' ? 'active' : ''}`} onClick={() => setMode('once')}>統計一次</button>
             <button className={`output-mode-btn ${mode === 'schedule' ? 'active' : ''}`} onClick={() => setMode('schedule')}>持續統計</button>
@@ -1291,13 +1771,291 @@ const CHART_TYPES = {
   ],
 };
 
+// ── Auth Gate ──
+function AuthGate({ onAuth, devBypass }) {
+  const [mode, setMode] = useState('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  const handle = async () => {
+    if (!email || !password) return;
+    setLoading(true); setError(''); setSuccess('');
+    try {
+      if (mode === 'login') {
+        const cred = await auth.signInWithEmailAndPassword(email, password);
+        onAuth(cred.user);
+      } else {
+        await auth.createUserWithEmailAndPassword(email, password);
+        setSuccess('帳號建立成功，請登入'); setMode('login');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const switchMode = (m) => { setMode(m); setError(''); setSuccess(''); };
+
+  return (
+    <div className="auth-overlay">
+      <div className="auth-topbar">
+        <div className="auth-topbar-logo">
+          <span className="dot" />ML Intelligence Platform
+        </div>
+      </div>
+      <div className="auth-body">
+        <div className="auth-card">
+          <div className="auth-card-header">
+            <div className="auth-card-title">{mode === 'login' ? '登入' : '建立帳號'}</div>
+            <div className="auth-card-sub">{mode === 'login' ? '輸入帳號密碼以存取平台' : '建立帳號開始使用'}</div>
+          </div>
+          <div className="auth-card-body">
+            {error && <div className="auth-error">{error}</div>}
+            {success && <div className="auth-success">{success}</div>}
+            <div className="auth-field">
+              <label className="auth-label">Email</label>
+              <input className="auth-input" type="email" placeholder="you@example.com"
+                value={email} onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handle()} autoFocus />
+            </div>
+            <div className="auth-field">
+              <label className="auth-label">密碼</label>
+              <input className="auth-input" type="password" placeholder="••••••••"
+                value={password} onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handle()} />
+            </div>
+            <button className="auth-btn" onClick={handle} disabled={loading || !email || !password}>
+              {loading ? '處理中...' : mode === 'login' ? '登入' : '建立帳號'}
+            </button>
+            <div className="auth-toggle">
+              {mode === 'login'
+                ? <>還沒有帳號？<span onClick={() => switchMode('signup')}>註冊</span></>
+                : <>已有帳號？<span onClick={() => switchMode('login')}>登入</span></>
+              }
+            </div>
+            {devBypass && (
+              <button onClick={devBypass} style={{ marginTop:12, padding:'6px 12px', border:'1px solid var(--border)', borderRadius:6, background:'transparent', color:'var(--text-muted)', fontSize:11, cursor:'pointer', fontFamily:'DM Mono, monospace' }}>
+                Dev Mode (skip login)
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Run History Helpers ──
+function fmtTime(ts) {
+  const d = new Date(ts);
+  return `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}:${d.getSeconds().toString().padStart(2,'0')}`;
+}
+
+function exportRunsCsv(runs) {
+  if (!runs.length) return;
+  const headers = ['#','時間','模型','Accuracy','F1','Precision','Recall','ROC-AUC','Test%','特徵數','參數'];
+  const rows = runs.map((r, i) => [
+    i + 1,
+    fmtTime(r.ts),
+    r.modelName,
+    r.metrics?.accuracy != null ? (r.metrics.accuracy * 100).toFixed(1) + '%' : '-',
+    r.metrics?.f1 != null ? (r.metrics.f1 * 100).toFixed(1) + '%' : '-',
+    r.metrics?.precision != null ? (r.metrics.precision * 100).toFixed(1) + '%' : '-',
+    r.metrics?.recall != null ? (r.metrics.recall * 100).toFixed(1) + '%' : '-',
+    r.metrics?.roc_auc != null ? r.metrics.roc_auc.toFixed(3) : '-',
+    r.testSplit + '%',
+    r.features?.length ?? '-',
+    JSON.stringify(r.params || {}),
+  ]);
+  const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+  const a = document.createElement('a'); a.href = url; a.download = `runs_${Date.now()}.csv`; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Run History Component ──
+function RunHistory({ runs, onRestore, onPin, onClear }) {
+  const [open, setOpen] = useState(true);
+  if (!runs.length) return null;
+
+  const bestIdx = runs.reduce((bi, r, i) => (r.metrics?.f1 ?? 0) > (runs[bi]?.metrics?.f1 ?? 0) ? i : bi, 0);
+
+  return (
+    <div className="run-history">
+      <div className="run-history-header" onClick={() => setOpen(v => !v)}>
+        <span className="run-history-title">實驗紀錄</span>
+        <span className="run-history-count">{runs.length} runs</span>
+        <button className="run-history-export" onClick={e => { e.stopPropagation(); exportRunsCsv(runs); }}>Export CSV</button>
+        <button className="run-history-export" onClick={e => { e.stopPropagation(); onClear(); }} style={{ color:'#DC2626', borderColor:'#FECACA' }}>清空</button>
+        <span className={`run-history-chevron ${open ? 'open' : ''}`}>▼</span>
+      </div>
+      {open && (
+        <div className="run-history-list">
+          {runs.length === 0
+            ? <div className="run-empty">還沒有實驗紀錄</div>
+            : [...runs].reverse().map((r, revIdx) => {
+                const origIdx = runs.length - 1 - revIdx;
+                const isBest = origIdx === bestIdx;
+                return (
+                  <div key={r.ts} className={`run-row ${r.pinned ? 'pinned' : ''}`}>
+                    <span className="run-num">#{origIdx + 1}</span>
+                    <span className="run-model" title={r.modelName}>{r.modelName}</span>
+                    <div className="run-metrics">
+                      {r.metrics?.f1 != null && (
+                        <span className={`run-metric-tag f1 ${isBest ? 'best' : ''}`}>
+                          F1 {(r.metrics.f1 * 100).toFixed(1)}%{isBest ? ' ★' : ''}
+                        </span>
+                      )}
+                      {r.metrics?.accuracy != null && <span className="run-metric-tag">Acc {(r.metrics.accuracy * 100).toFixed(1)}%</span>}
+                      {r.metrics?.roc_auc != null && <span className="run-metric-tag">AUC {r.metrics.roc_auc.toFixed(3)}</span>}
+                    </div>
+                    <span className="run-time">{fmtTime(r.ts)}</span>
+                    <div className="run-actions">
+                      <button className={`run-action-btn ${r.pinned ? 'pin-active' : ''}`} onClick={() => onPin(origIdx)} title="釘選">
+                        {r.pinned ? '★' : '☆'}
+                      </button>
+                      <button className="run-action-btn" onClick={() => onRestore(r)} title="重現此設定">重現</button>
+                    </div>
+                  </div>
+                );
+              })
+          }
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Compare Results ──
+function CompareResults({ results }) {
+  return (
+    <div className="compare-results">
+      {results.map((r, i) => (
+        <div key={r.model_id} className={`compare-result-row ${i === 0 ? 'best' : ''}`}>
+          <span className="compare-rank">#{r.rank}</span>
+          {i === 0 && <span className="compare-best-badge">BEST</span>}
+          <span className="compare-result-model">{r.model || r.model_id}</span>
+          {r.error ? (
+            <span className="compare-error">{r.error}</span>
+          ) : (
+            <div className="compare-metrics">
+              <span className={`compare-metric ${i === 0 ? 'highlight' : ''}`}>F1 {(r.f1*100).toFixed(1)}%</span>
+              <span className="compare-metric">Acc {(r.accuracy*100).toFixed(1)}%</span>
+              <span className="compare-metric">Prec {(r.precision*100).toFixed(1)}%</span>
+              <span className="compare-metric">Rec {(r.recall*100).toFixed(1)}%</span>
+              {r.roc_auc != null && <span className="compare-metric">AUC {r.roc_auc.toFixed(3)}</span>}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Compare Panel ──
+function ComparePanel({ panelType, compareParams, onParamsChange, onRun, running, testSplit }) {
+  const models = BUILTIN_MODELS[panelType] || [];
+  return (
+    <div className="compare-panel">
+      {models.map(m => {
+        const schema = PARAM_SCHEMA[panelType]?.[m.id] || [];
+        const mParams = compareParams[m.id] || {};
+        return (
+          <div key={m.id} className="compare-model-row">
+            <span className="compare-model-name">{m.label}</span>
+            <div className="compare-params">
+              {schema.map(p => (
+                <div key={p.key} className="compare-param">
+                  <label>{p.code}</label>
+                  <input
+                    type="number" min={p.min} max={p.max} step={p.step}
+                    value={mParams[p.key] ?? p.def}
+                    onChange={e => onParamsChange(m.id, p.key, p.step < 1 ? parseFloat(e.target.value) : parseInt(e.target.value))}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      <button className="compare-run-btn" onClick={onRun} disabled={running}>
+        {running ? '分析中...' : `全部跑  ·  test ${testSplit}%`}
+      </button>
+    </div>
+  );
+}
+
+// ── Param Controls ──
+function ParamControls({ panelType, modelId, params, expertMode, simpleLevel, onChange, onSimpleLevelChange }) {
+  if (!expertMode) {
+    // 簡單模式：三段選擇器
+    return (
+      <div className="level-selector">
+        {LEVEL_META.map(lv => (
+          <button
+            key={lv.key}
+            className={`level-btn ${simpleLevel === lv.key ? 'active' : ''}`}
+            onClick={() => {
+              onSimpleLevelChange(lv.key);
+              const preset = PARAM_PRESETS[panelType]?.[modelId]?.[lv.key] || {};
+              onChange(preset);
+            }}
+          >
+            <span className="level-btn-label">{lv.label}</span>
+            <span className="level-btn-desc">{lv.desc}</span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  // 複雜模式：個別滑桿
+  const schema = PARAM_SCHEMA[panelType]?.[modelId] || [];
+  if (!schema.length) return <div className="param-controls-empty">此模型無可調參數</div>;
+  return (
+    <div className="param-controls">
+      {schema.map(p => {
+        const val = params[p.key] ?? p.def;
+        return (
+          <div key={p.key} className="param-row">
+            <div className="param-header">
+              <span className="param-label-text">{p.label}</span>
+              <span className="param-label-code">{p.code}</span>
+              <span className="param-value-tag">{val}</span>
+            </div>
+            <div className="param-slider-wrap">
+              <input
+                type="range" className="param-slider"
+                min={p.min} max={p.max} step={p.step}
+                value={val}
+                onChange={e => onChange({ ...params, [p.key]: p.step < 1 ? parseFloat(e.target.value) : parseInt(e.target.value) })}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Model Selector ──
-function ModelSelector({ panelType, selectedModel, selectedChart, externalApis, onSelect, onChartChange }) {
+function ModelSelector({ panelType, selectedModel, selectedChart, externalApis, expertMode, onSelect, onChartChange, onExpertModeChange, params, onParamsChange, simpleLevel, onSimpleLevelChange }) {
   const builtins = BUILTIN_MODELS[panelType] || [];
   const chartTypes = CHART_TYPES[panelType] || [];
   return (
     <div className="model-selector">
-      <div className="model-selector-label">模型選擇</div>
+      <div className="mode-toggle-wrap">
+        <div className={`mode-pill ${expertMode ? 'expert' : ''}`} onClick={() => onExpertModeChange(!expertMode)}>
+          <div className="mode-pill-thumb" />
+          <span className="mode-pill-label left">簡單</span>
+          <span className="mode-pill-label right">複雜</span>
+        </div>
+      </div>
+      <div className="model-selector-label" style={{ marginTop:8 }}>模型選擇</div>
       <div className="model-options">
         {builtins.map(m => (
           <div key={m.id} className={`model-option builtin ${selectedModel?.id === m.id ? 'selected' : ''}`} onClick={() => onSelect({ type:'builtin', id:m.id, label:m.label })}>
@@ -1315,6 +2073,22 @@ function ModelSelector({ panelType, selectedModel, selectedChart, externalApis, 
           </>
         )}
       </div>
+
+      {selectedModel?.type === 'builtin' && (
+        <>
+          <div style={{ height:1, background:'var(--border)', margin:'10px 0 0' }} />
+          <div className="model-selector-label" style={{ padding:'8px 12px 4px' }}>參數調整</div>
+          <ParamControls
+            panelType={panelType}
+            modelId={selectedModel.id}
+            params={params}
+            expertMode={expertMode}
+            simpleLevel={simpleLevel}
+            onChange={onParamsChange}
+            onSimpleLevelChange={onSimpleLevelChange}
+          />
+        </>
+      )}
 
       {chartTypes.length > 0 && (
         <>
@@ -1334,6 +2108,193 @@ function ModelSelector({ panelType, selectedModel, selectedChart, externalApis, 
 }
 
 // ── Panel ──
+// ── Code Panel ──
+function CodePanel({ panel, onClose, onDrop, isDragging, onPanelDragStart, onPanelDragEnd, onPanelDragOver, onPanelDrop, reorderTarget }) {
+  const [code, setCode] = useState(`# 資料集會自動載入為 df (pandas DataFrame)\n# 將結果存入 result 變數即可顯示\n\nprint(df.describe())\nresult = df.head(10)`);
+  const [output, setOutput] = useState(null);
+  const [running, setRunning] = useState(false);
+  const [isDatasetDragOver, setIsDatasetDragOver] = useState(false);
+  const textareaRef = useRef(null);
+
+  const lineCount = code.split('\n').length;
+
+  const handleRun = async () => {
+    if (!panel.dataset) return;
+    setRunning(true); setOutput(null);
+    try {
+      const dsId = await ensureBackendDataset(panel.dataset);
+      const resp = await fetch(`${API_BASE}/api/code/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, dataset_id: dsId }),
+      });
+      if (!resp.ok) throw new Error(`API error ${resp.status}`);
+      const data = await resp.json();
+      setOutput(data);
+    } catch (err) {
+      setOutput({ ok: false, error: err.message, stdout: '', latency_ms: 0 });
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const ta = e.target;
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      setCode(code.substring(0, start) + '    ' + code.substring(end));
+      setTimeout(() => { ta.selectionStart = ta.selectionEnd = start + 4; }, 0);
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleRun();
+    }
+  };
+
+  const handleScroll = (e) => {
+    const lineNums = e.target.previousSibling;
+    if (lineNums) lineNums.scrollTop = e.target.scrollTop;
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    if (onPanelDragOver && isDragging !== panel.id) { onPanelDragOver(panel.id, e); return; }
+    setIsDatasetDragOver(true);
+  };
+  const handleDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsDatasetDragOver(false);
+      if (onPanelDragOver) onPanelDragOver(null, e);
+    }
+  };
+  const handleDrop = (e) => {
+    e.preventDefault(); setIsDatasetDragOver(false);
+    if (isDragging) { onPanelDrop(panel.id); return; }
+    try { const data = JSON.parse(e.dataTransfer.getData('application/json')); onDrop(panel.id, data); } catch(_) {}
+  };
+
+  let panelClass = 'panel';
+  if (isDragging === panel.id) panelClass += ' dragging-panel';
+  else if (reorderTarget === panel.id) panelClass += ' reorder-target-left';
+  else if (isDatasetDragOver) panelClass += ' drop-target';
+
+  return (
+    <div className={panelClass} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop} style={{ display:'flex', flexDirection:'column' }}>
+      <div className="panel-header">
+        <span className="drag-handle" draggable title="拖動面板"
+          onDragStart={e => { e.stopPropagation(); onPanelDragStart(panel.id); }}
+          onDragEnd={onPanelDragEnd}>&#x2807;</span>
+        <span className="panel-type-badge code">Code</span>
+        {panel.dataset
+          ? <span className="panel-dataset-name">{panel.dataset.name}</span>
+          : <span className="panel-dataset-none">拖入資料集...</span>}
+        <div className="panel-actions">
+          <button className="panel-btn" title="關閉" onClick={() => onClose(panel.id)}>&#x2715;</button>
+        </div>
+      </div>
+
+      {!panel.dataset ? (
+        <div className="panel-body">
+          <div className={`drop-zone ${isDatasetDragOver ? 'active' : ''}`}>
+            <div className="drop-zone-icon">&#x2295;</div>
+            <div>將資料集拖曳到這裡</div>
+            <div style={{ marginTop:4, fontSize:11 }}>資料會載入為 df 變數</div>
+          </div>
+        </div>
+      ) : (
+        <div className="code-panel-wrap">
+          <div className="code-toolbar">
+            <button className="code-run-btn" onClick={handleRun} disabled={running || !code.trim()}>
+              <span className="run-icon" />
+              {running ? '執行中...' : '執行'}
+            </button>
+            <button className="code-clear-btn" onClick={() => setOutput(null)}>清除輸出</button>
+            {panel.dataset && <span className="code-ds-tag">df = {panel.dataset.name}</span>}
+            <span className="code-latency-tag">
+              {output?.latency_ms != null ? `${output.latency_ms}ms` : `\u2318+Enter 執行`}
+            </span>
+          </div>
+
+          <div className="code-editor-area">
+            <div className="code-line-numbers">
+              {Array.from({ length: lineCount }, (_, i) => (
+                <div key={i} style={{ padding: '0 6px 0 0', height: '1.75em' }}>{i + 1}</div>
+              ))}
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={code}
+              onChange={e => setCode(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onScroll={handleScroll}
+              placeholder="# 在這裡寫 Python 程式碼..."
+              spellCheck={false}
+              autoComplete="off"
+              autoCorrect="off"
+            />
+          </div>
+
+          <div className="code-output-area scrollbar-thin">
+            <div className="code-output-header">
+              <span className={`code-output-status ${!output ? 'idle' : output.ok ? 'ok' : 'err'}`} />
+              {!output ? '輸出' : output.ok ? '執行成功' : '執行錯誤'}
+            </div>
+            <div className="code-output-body">
+              {!output ? (
+                <div className="code-empty-state">
+                  <div className="code-empty-icon">&gt;_</div>
+                  <div className="code-empty-text">按下執行按鈕或 Cmd+Enter 開始<br/>支援 pandas, numpy, sklearn, scipy</div>
+                </div>
+              ) : (
+                <>
+                  {output.error && <div className="code-error-block">{output.error}</div>}
+                  {output.stdout && (
+                    <>
+                      <span className="code-result-label">stdout</span>
+                      <div className="code-stdout">{output.stdout}</div>
+                    </>
+                  )}
+                  {output.result?.type === 'dataframe' && (
+                    <>
+                      <span className="code-result-label">result (DataFrame)</span>
+                      <div style={{ overflowX:'auto' }}>
+                        <table className="code-result-df">
+                          <thead><tr>{output.result.columns.map(c => <th key={c}>{c}</th>)}</tr></thead>
+                          <tbody>
+                            {output.result.rows.map((row, i) => (
+                              <tr key={i}>{output.result.columns.map(c => <td key={c}>{typeof row[c] === 'number' ? Number(row[c]).toFixed(4) : String(row[c])}</td>)}</tr>
+                            ))}
+                          </tbody>
+                          <tfoot><tr><td className="df-shape" colSpan={output.result.columns.length}>{output.result.shape[0]} rows x {output.result.shape[1]} columns</td></tr></tfoot>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                  {output.result?.type === 'json' && (
+                    <>
+                      <span className="code-result-label">result</span>
+                      <pre className="code-result-json">{JSON.stringify(output.result.data, null, 2)}</pre>
+                    </>
+                  )}
+                  {output.result?.type === 'text' && (
+                    <>
+                      <span className="code-result-label">result</span>
+                      <div className="code-stdout">{output.result.data}</div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragStart, onPanelDragEnd, onPanelDragOver, onPanelDrop, reorderTarget }) {
   const [isDatasetDragOver, setIsDatasetDragOver] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1347,26 +2308,73 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
   const [selectedChart, setSelectedChart] = useState(
     panel.type === 'cluster' ? 'doughnut' : panel.type === 'predict' ? 'hbar' : 'hbar'
   );
+  const [expertMode, setExpertMode] = useState(false);
+  const [simpleLevel, setSimpleLevel] = useState('mid');
+  const [showSettings, setShowSettings] = useState(false);
+  const [compareMode, setCompareMode] = useState(false);
+  const [runHistory, setRunHistory] = useState([]);
+  const [compareParams, setCompareParams] = useState(() => initCompareParams(panel.type));
+  const [compareResult, setCompareResult] = useState(null);
+  const [compareLoading, setCompareLoading] = useState(false);
+  const [testSplit, setTestSplit] = useState(20);
+  const [selectedFeatures, setSelectedFeatures] = useState([]);
+  const initModelId = panel.type === 'cluster' ? 'kmeans' : panel.type === 'predict' ? 'xgboost' : 'collab';
+  const [params, setParams] = useState(() => PARAM_PRESETS[panel.type]?.[initModelId]?.mid || defaultParams(panel.type, initModelId));
 
-  const runAnalysis = async (ds, model) => {
+  // Load run history from Supabase on mount
+  useEffect(() => {
+    if (panel.type === 'predict') {
+      sbLoadRuns('predict').then(runs => setRunHistory(runs));
+    }
+  }, []);
+
+  // Populate feature list when dataset loads
+  useEffect(() => {
+    if (panel.dataset) {
+      const cols = getDatasetCols(panel.dataset);
+      setSelectedFeatures(cols.slice(0, -1));
+    }
+  }, [panel.dataset?.id]);
+
+  const runAnalysis = async (ds, model, overrideParams) => {
     if (!ds) return;
     setLoading(true); setResult(null);
     try {
       if (model?.type === 'external') {
-        // External APIs still use mock (no backend proxy)
         await new Promise(r => setTimeout(r, 1200 + Math.random()*400));
         setResult(mockExtResult(model.api));
         return;
       }
       const dsId = await ensureBackendDataset(ds);
+      const activeParams = overrideParams ?? params;
+      const fullParams = {
+        ...activeParams,
+        test_size: testSplit / 100,
+        ...(selectedFeatures.length ? { feature_cols: selectedFeatures } : {}),
+      };
       const resp = await fetch(`${API_BASE}/api/analyze/${panel.type}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataset_id: dsId, model_id: model?.id || (panel.type === 'cluster' ? 'kmeans' : panel.type === 'predict' ? 'xgboost' : 'collab'), params: {} }),
+        body: JSON.stringify({ dataset_id: dsId, model_id: model?.id || initModelId, params: fullParams }),
       });
       if (!resp.ok) throw new Error(`API error ${resp.status}`);
       const { result } = await resp.json();
       setResult(result);
+      if (panel.type === 'predict') {
+        const run = {
+          ts: Date.now(),
+          modelId: model?.id || initModelId,
+          modelName: result.model || model?.label || model?.id || initModelId,
+          params: { ...(overrideParams ?? params) },
+          metrics: { accuracy: result.accuracy, f1: result.f1, precision: result.precision, recall: result.recall, roc_auc: result.roc_auc },
+          testSplit,
+          features: selectedFeatures,
+          pinned: false,
+        };
+        sbSaveRun('predict', panel.dataset?.name, run).then(id => {
+          setRunHistory(prev => [...prev, { ...run, id }]);
+        });
+      }
     } catch (err) {
       console.error('Analysis failed:', err);
       setResult({ _error: err.message });
@@ -1375,11 +2383,82 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
     }
   };
 
+  const runCompare = async () => {
+    if (!panel.dataset) return;
+    setCompareLoading(true); setCompareResult(null);
+    try {
+      const dsId = await ensureBackendDataset(panel.dataset);
+      const resp = await fetch(`${API_BASE}/api/analyze/predict/compare`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dataset_id: dsId,
+          test_size: testSplit / 100,
+          feature_cols: selectedFeatures.length ? selectedFeatures : [],
+          models: compareParams,
+        }),
+      });
+      if (!resp.ok) throw new Error(`API error ${resp.status}`);
+      const { results } = await resp.json();
+      setCompareResult(results);
+      const ts = Date.now();
+      const newRuns = results.filter(r => !r.error).map(r => ({
+        ts: ts + r.rank,
+        modelId: r.model_id,
+        modelName: r.model || r.model_id,
+        params: compareParams[r.model_id] || {},
+        metrics: { accuracy: r.accuracy, f1: r.f1, precision: r.precision, recall: r.recall, roc_auc: r.roc_auc },
+        testSplit,
+        features: selectedFeatures,
+        pinned: false,
+      }));
+      Promise.all(newRuns.map(run => sbSaveRun('predict', panel.dataset?.name, run)
+        .then(id => ({ ...run, id }))
+      )).then(saved => setRunHistory(prev => [...prev, ...saved]));
+    } catch (err) {
+      setCompareResult([{ model_id: 'error', model: 'Error', error: err.message, rank: 1, f1: 0, accuracy: 0, precision: 0, recall: 0 }]);
+    } finally {
+      setCompareLoading(false);
+    }
+  };
+
   useEffect(() => { if (panel.dataset) runAnalysis(panel.dataset, selectedModel); }, [panel.dataset]);
 
   const handleModelSelect = (model) => {
+    const newParams = PARAM_PRESETS[panel.type]?.[model.id]?.mid || defaultParams(panel.type, model.id);
     setSelectedModel(model);
-    if (panel.dataset) runAnalysis(panel.dataset, model);
+    setParams(newParams);
+    setSimpleLevel('mid');
+    if (panel.dataset) runAnalysis(panel.dataset, model, newParams);
+  };
+
+  const handleParamsChange = (newParams) => {
+    setParams(newParams);
+    if (panel.dataset) runAnalysis(panel.dataset, selectedModel, newParams);
+  };
+
+  const handleCompareParamChange = (modelId, key, val) => {
+    setCompareParams(prev => ({ ...prev, [modelId]: { ...prev[modelId], [key]: val } }));
+  };
+
+  const handleRestore = (run) => {
+    const model = { type: 'builtin', id: run.modelId, label: run.modelName };
+    setSelectedModel(model);
+    setParams(run.params);
+    setTestSplit(run.testSplit);
+    if (run.features?.length) setSelectedFeatures(run.features);
+    setCompareMode(false);
+    setShowModelSelector(true);
+    if (panel.dataset) runAnalysis(panel.dataset, model, run.params);
+  };
+
+  const handlePin = (idx) => {
+    setRunHistory(prev => prev.map((r, i) => {
+      if (i !== idx) return r;
+      const newPinned = !r.pinned;
+      if (r.id) sbTogglePin(r.id, newPinned);
+      return { ...r, pinned: newPinned };
+    }));
   };
 
   const handleDragOver = (e) => {
@@ -1436,8 +2515,18 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
           : <span className="panel-dataset-none">拖入資料集...</span>
         }
         <div className="panel-actions">
+          {panel.dataset && panel.type === 'predict' && (
+            <button className={`panel-btn ${compareMode ? 'active' : ''}`} title="比較模式" onClick={() => { setCompareMode(v => !v); setShowSettings(false); setShowModelSelector(false); }}>
+              ⊞
+            </button>
+          )}
           {panel.dataset && (
-            <button className={`panel-btn ${showModelSelector ? 'active' : ''}`} title="選擇模型" onClick={() => setShowModelSelector(v => !v)}>
+            <button className={`panel-btn ${showSettings ? 'active' : ''}`} title="資料設定" onClick={() => { setShowSettings(v => !v); setShowModelSelector(false); setCompareMode(false); }}>
+              ⚙
+            </button>
+          )}
+          {panel.dataset && !compareMode && (
+            <button className={`panel-btn ${showModelSelector ? 'active' : ''}`} title="選擇模型" onClick={() => { setShowModelSelector(v => !v); setShowSettings(false); }}>
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
                 <line x1="1.5" y1="2.5" x2="11.5" y2="2.5"/>
                 <circle cx="4" cy="2.5" r="1.5" fill="currentColor" stroke="none"/>
@@ -1448,29 +2537,103 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
               </svg>
             </button>
           )}
-          {panel.dataset && (
+          {panel.dataset && !compareMode && (
             <button className="panel-btn" title="重新執行" onClick={() => runAnalysis(panel.dataset, selectedModel)}>↻</button>
           )}
           <button className="panel-btn" title="關閉" onClick={() => onClose(panel.id)}>✕</button>
         </div>
       </div>
 
-      {showModelSelector && panel.dataset && (
+      {showSettings && panel.dataset && (() => {
+        const cols = getDatasetCols(panel.dataset);
+        return (
+          <div className="settings-panel">
+            <div className="settings-row">
+              <span className="settings-label">Test 比例</span>
+              <div className="settings-split-input">
+                <input type="number" min="10" max="50" step="5" value={testSplit}
+                  onChange={e => setTestSplit(Math.max(10, Math.min(50, parseInt(e.target.value) || 20)))} />
+                <span>%</span>
+              </div>
+              <span className="settings-hint">Train {100-testSplit}% / Test {testSplit}%</span>
+            </div>
+            {cols.length > 0 && (
+              <div className="settings-row" style={{ flexDirection:'column', alignItems:'flex-start' }}>
+                <div style={{ display:'flex', alignItems:'center', width:'100%', marginBottom:6 }}>
+                  <span className="settings-label">特徵欄位</span>
+                  <div className="settings-feat-actions">
+                    <button className="settings-feat-btn" onClick={() => setSelectedFeatures(cols.slice(0,-1))}>全選</button>
+                    <button className="settings-feat-btn" onClick={() => setSelectedFeatures([])}>清空</button>
+                  </div>
+                </div>
+                <div className="feature-checkboxes">
+                  {cols.map((col, i) => {
+                    const isTarget = i === cols.length - 1;
+                    const checked = selectedFeatures.includes(col);
+                    return (
+                      <label key={col} className={`feature-checkbox ${checked ? 'checked' : ''}`}
+                        title={isTarget ? '最後欄位為目標變數（自動排除）' : col}>
+                        <input type="checkbox" disabled={isTarget}
+                          checked={isTarget ? false : checked}
+                          onChange={e => setSelectedFeatures(prev =>
+                            e.target.checked ? [...prev, col] : prev.filter(c => c !== col)
+                          )} />
+                        {col}{isTarget ? ' *' : ''}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {compareMode && panel.dataset && (
+        <>
+          <ComparePanel
+            panelType={panel.type}
+            compareParams={compareParams}
+            onParamsChange={handleCompareParamChange}
+            onRun={runCompare}
+            running={compareLoading}
+            testSplit={testSplit}
+          />
+          {compareLoading && (
+            <div className="analysis-loading" style={{ padding:'12px 16px' }}>
+              <div className="spinner" /><span>四個模型分析中...</span>
+            </div>
+          )}
+          {compareResult && !compareLoading && (
+            <div className="panel-body" style={{ borderTop:'1px solid var(--border)' }}>
+              <CompareResults results={compareResult} />
+            </div>
+          )}
+        </>
+      )}
+
+      {showModelSelector && panel.dataset && !compareMode && (
         <ModelSelector
           panelType={panel.type}
           selectedModel={selectedModel}
           selectedChart={selectedChart}
           externalApis={externalApis}
+          expertMode={expertMode}
+          params={params}
           onSelect={handleModelSelect}
           onChartChange={setSelectedChart}
+          onExpertModeChange={setExpertMode}
+          onParamsChange={handleParamsChange}
+          simpleLevel={simpleLevel}
+          onSimpleLevelChange={setSimpleLevel}
         />
       )}
 
-      {panel.dataset && result && !loading && (
+      {panel.dataset && result && !loading && !compareMode && (
         <DataPreview dataset={panel.dataset} />
       )}
 
-      <div className="panel-body">
+      {!compareMode && <div className="panel-body">
         {!panel.dataset ? (
           <div className={`drop-zone ${isDatasetDragOver ? 'active' : ''}`}>
             <div className="drop-zone-icon">⊕</div>
@@ -1493,8 +2656,16 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
           panel.type === 'predict' ? <PredictContent result={result} chartType={selectedChart} /> :
           <RecommendContent result={result} chartType={selectedChart} />
         ) : null}
-      </div>
-      <OutputSection result={result} />
+      </div>}
+      {!compareMode && <OutputSection result={result} />}
+      {panel.type === 'predict' && (
+        <RunHistory
+          runs={runHistory}
+          onRestore={handleRestore}
+          onPin={handlePin}
+          onClear={() => setRunHistory([])}
+        />
+      )}
     </div>
   );
 }
@@ -1768,6 +2939,19 @@ function DatasetUploader({ onAdd }) {
 
 // ── App ──
 function App() {
+  const [user, setUser] = useState(undefined); // undefined=checking, null=not logged in
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(u => setUser(u ?? null));
+    return () => unsub();
+  }, []);
+
+  if (user === undefined) return null; // still checking
+  if (user === null) return <AuthGate onAuth={setUser} devBypass={() => setUser({ email: 'dev@local' })} />;
+  return <Dashboard user={user} sb={sb} />;
+}
+
+function Dashboard({ user, sb }) {
   const [activeProject, setActiveProject] = useState('ecom');
   const [panels, setPanels] = useState([
     { id: 'p1', type: 'cluster', dataset: DATASETS.ecom[0] },
@@ -1857,7 +3041,7 @@ function App() {
   const addUploadedDataset = (ds) => setUploadedDatasets(prev => [ds, ...prev]);
 
   const datasets = [...(DATASETS[activeProject] || []), ...uploadedDatasets];
-  const TYPE_LABEL = { cluster:'分群', predict:'預測', recommend:'推薦' };
+  const TYPE_LABEL = { cluster:'分群', predict:'預測', recommend:'推薦', code:'Code' };
 
   return (
     <div className="app">
@@ -1871,6 +3055,11 @@ function App() {
         <div className="topbar-actions">
           <button className="btn btn-ghost" onClick={() => setShowApiDocs(true)}>⚡ API 串接</button>
           <button className="btn btn-primary">+ 新增 Project</button>
+          <div className="topbar-divider" />
+          <div className="auth-user">
+            <span className="auth-user-email">{user.email}</span>
+            <button className="auth-signout" onClick={() => auth.signOut()}>登出</button>
+          </div>
         </div>
       </div>
 
@@ -1949,6 +3138,7 @@ function App() {
               <button className="panel-type-btn cluster" onClick={() => addPanel('cluster')}>+ 分群</button>
               <button className="panel-type-btn predict" onClick={() => addPanel('predict')}>+ 預測</button>
               <button className="panel-type-btn recommend" onClick={() => addPanel('recommend')}>+ 推薦</button>
+              <button className="panel-type-btn code" onClick={() => addPanel('code')}>&gt;_ Code</button>
             </div>
           </div>
 
@@ -1960,21 +3150,24 @@ function App() {
             </div>
           ) : viewMode === 'grid' ? (
             <div className="panels-grid">
-              {panels.map(panel => (
-                <Panel
-                  key={panel.id}
-                  panel={panel}
-                  externalApis={externalApis}
-                  onClose={closePanel}
-                  onDrop={dropDataset}
-                  isDragging={draggingPanelId}
-                  reorderTarget={reorderTarget}
-                  onPanelDragStart={handlePanelDragStart}
-                  onPanelDragEnd={handlePanelDragEnd}
-                  onPanelDragOver={handlePanelDragOver}
-                  onPanelDrop={handlePanelDrop}
-                />
-              ))}
+              {panels.map(panel => {
+                const PanelComp = panel.type === 'code' ? CodePanel : Panel;
+                return (
+                  <PanelComp
+                    key={panel.id}
+                    panel={panel}
+                    externalApis={externalApis}
+                    onClose={closePanel}
+                    onDrop={dropDataset}
+                    isDragging={draggingPanelId}
+                    reorderTarget={reorderTarget}
+                    onPanelDragStart={handlePanelDragStart}
+                    onPanelDragEnd={handlePanelDragEnd}
+                    onPanelDragOver={handlePanelDragOver}
+                    onPanelDrop={handlePanelDrop}
+                  />
+                );
+              })}
             </div>
           ) : (
             // ── Focus mode ──
@@ -1999,21 +3192,24 @@ function App() {
                 ))}
               </div>
               <div className="focus-panel-wrap">
-                {panels.filter(p => p.id === activeTab).map(panel => (
-                  <Panel
-                    key={panel.id}
-                    panel={panel}
-                    externalApis={externalApis}
-                    onClose={closePanel}
-                    onDrop={dropDataset}
-                    isDragging={null}
-                    reorderTarget={null}
-                    onPanelDragStart={() => {}}
-                    onPanelDragEnd={() => {}}
-                    onPanelDragOver={() => {}}
-                    onPanelDrop={() => {}}
-                  />
-                ))}
+                {panels.filter(p => p.id === activeTab).map(panel => {
+                  const PanelComp = panel.type === 'code' ? CodePanel : Panel;
+                  return (
+                    <PanelComp
+                      key={panel.id}
+                      panel={panel}
+                      externalApis={externalApis}
+                      onClose={closePanel}
+                      onDrop={dropDataset}
+                      isDragging={null}
+                      reorderTarget={null}
+                      onPanelDragStart={() => {}}
+                      onPanelDragEnd={() => {}}
+                      onPanelDragOver={() => {}}
+                      onPanelDrop={() => {}}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
