@@ -3465,7 +3465,31 @@ function Dashboard({ user }) {
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+// ── Error Boundary ──
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null, info: null }; }
+  static getDerivedStateFromError(error) { return { error }; }
+  componentDidCatch(error, info) { this.setState({ info }); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding:40, fontFamily:'DM Mono, monospace', maxWidth:700, margin:'60px auto' }}>
+          <h2 style={{ color:'#DC2626', fontSize:18, marginBottom:12 }}>Something went wrong</h2>
+          <pre style={{ background:'#FEF2F2', border:'1px solid #FECACA', borderRadius:8, padding:16, fontSize:12, whiteSpace:'pre-wrap', wordBreak:'break-word', overflow:'auto', maxHeight:300 }}>
+            {this.state.error.toString()}
+            {this.state.info?.componentStack}
+          </pre>
+          <button onClick={() => window.location.reload()} style={{ marginTop:16, padding:'8px 16px', background:'#1F2937', color:'#fff', border:'none', borderRadius:6, cursor:'pointer', fontSize:13 }}>
+            重新載入
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<ErrorBoundary><App /></ErrorBoundary>);
 </script>
 </body>
 </html>
