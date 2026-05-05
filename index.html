@@ -2354,17 +2354,20 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
       }
       const dsId = await ensureBackendDataset(ds);
       const activeParams = overrideParams ?? params;
-      const fullParams = {
-        ...activeParams,
-        test_size: testSplit / 100,
-        ...(selectedFeatures.length ? { feature_cols: selectedFeatures } : {}),
-      };
+      const fullParams = { ...activeParams };
+      if (panel.type === 'predict') {
+        fullParams.test_size = testSplit / 100;
+        if (selectedFeatures.length) fullParams.feature_cols = selectedFeatures;
+      }
       const resp = await fetch(`${API_BASE}/api/analyze/${panel.type}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataset_id: dsId, model_id: model?.id || initModelId, params: fullParams }),
       });
-      if (!resp.ok) throw new Error(`API error ${resp.status}`);
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => ({}));
+        throw new Error(errBody.detail || `API error ${resp.status}`);
+      }
       const { result } = await resp.json();
       setResult(result);
       if (panel.type === 'predict') {
