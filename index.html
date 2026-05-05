@@ -3332,7 +3332,7 @@ function Dashboard({ user }) {
           {sidebarOpen ? '‹' : '›'}
         </div>
         {/* Sidebar */}
-        <div className={`sidebar ${!sidebarOpen ? 'collapsed' : ''}`}
+        <div className={`sidebar ${!sidebarOpen ? 'collapsed' : ''}`}>
           <div className="sidebar-section">
             <div className="sidebar-label">Projects</div>
             {projects.map(p => {
