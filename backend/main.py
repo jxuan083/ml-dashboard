@@ -23,6 +23,11 @@ app.add_middleware(
 # ── In-memory store ──
 datasets: dict[str, dict] = {}
 jobs: dict[str, dict] = {}
+projects: dict[str, dict] = {
+    "ecom": {"id": "ecom", "name": "電商分析", "icon": "E"},
+    "bank": {"id": "bank", "name": "金融風控", "icon": "F"},
+    "health": {"id": "health", "name": "醫療數據", "icon": "H"},
+}
 
 # ── WebSocket connections ──
 ws_clients: list[WebSocket] = []
@@ -49,6 +54,36 @@ async def websocket_endpoint(ws: WebSocket):
             await ws.receive_text()
     except WebSocketDisconnect:
         ws_clients.remove(ws)
+
+
+# ── Project endpoints ──
+
+class CreateProject(BaseModel):
+    id: str | None = None
+    name: str
+    icon: str | None = None
+
+
+@app.get("/api/projects")
+def list_projects():
+    # Compute datasetCount from actual datasets
+    result = []
+    for p in projects.values():
+        count = sum(1 for d in datasets.values() if d.get("project") == p["id"])
+        result.append({**p, "datasetCount": count})
+    return {"projects": result}
+
+
+@app.post("/api/projects")
+async def create_project(body: CreateProject):
+    proj_id = body.id or body.name.lower().replace(" ", "_")
+    if proj_id in projects:
+        raise HTTPException(409, "Project already exists")
+    icon = body.icon or body.name[0].upper()
+    proj = {"id": proj_id, "name": body.name, "icon": icon}
+    projects[proj_id] = proj
+    await broadcast({"type": "project_new", "project": {**proj, "datasetCount": 0}})
+    return proj
 
 
 # ── Schemas ──
@@ -89,6 +124,11 @@ class AppendData(BaseModel):
 
 @app.post("/api/datasets/push")
 async def push_dataset(body: PushDataset):
+    # Auto-create project if it doesn't exist
+    if body.project and body.project not in projects:
+        proj = {"id": body.project, "name": body.project, "icon": body.project[0].upper()}
+        projects[body.project] = proj
+        await broadcast({"type": "project_new", "project": {**proj, "datasetCount": 0}})
     ds_id = str(uuid.uuid4())[:8]
     df = pd.DataFrame(body.data)
     ds = {

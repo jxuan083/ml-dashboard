@@ -14,6 +14,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/theme/dracula.min.css">
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/addon/edit/closebrackets.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -653,28 +659,29 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .code-panel-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 
 .code-editor-area {
-  flex: 1; min-height: 140px; display: flex; position: relative;
+  flex: 1; min-height: 140px; display: flex; flex-direction: column; position: relative;
   background: #0F0E14;
   border-bottom: 1px solid #2A2835;
 }
 
-.code-line-numbers {
-  width: 38px; flex-shrink: 0; padding: 14px 0; text-align: right;
-  font-family: 'DM Mono', monospace; font-size: 11px; line-height: 1.75;
-  color: #3D3A4E; user-select: none; background: #0B0A10;
-  border-right: 1px solid #1E1C28; overflow: hidden;
+.code-editor-area .CodeMirror {
+  height: 100%;
+  flex: 1;
+  font-size: 13px;
+  font-family: 'DM Mono', monospace;
+  border-radius: 0;
+  border: none;
+  background: #0F0E14;
 }
 
-.code-editor-area textarea {
-  flex: 1; resize: none; border: none; outline: none;
-  padding: 14px 14px 14px 12px;
-  font-family: 'DM Mono', monospace; font-size: 11.5px; line-height: 1.75;
-  background: transparent; color: #D4D0E8; tab-size: 4;
-  overflow-y: auto; white-space: pre; word-wrap: off;
+.code-editor-area .CodeMirror-gutters {
+  background: #0B0A10;
+  border-right: 1px solid #1E1C28;
 }
 
-.code-editor-area textarea::placeholder { color: #4A4660; }
-.code-editor-area textarea::selection { background: rgba(99, 85, 199, 0.35); }
+.code-editor-area .CodeMirror-linenumber {
+  color: #3D3A4E;
+}
 
 .code-toolbar {
   display: flex; align-items: center; gap: 10px; padding: 7px 12px;
@@ -1180,7 +1187,7 @@ async function ensureBackendDataset(ds) {
 }
 
 // ── Static Data ──
-const PROJECTS = [
+const DEFAULT_PROJECTS = [
   { id: 'ecom', name: '電商分析', icon: 'E', datasetCount: 3 },
   { id: 'bank', name: '金融風控', icon: 'F', datasetCount: 2 },
   { id: 'health', name: '醫療數據', icon: 'H', datasetCount: 4 },
@@ -2141,9 +2148,32 @@ function CodePanel({ panel, onClose, onDrop, isDragging, onPanelDragStart, onPan
   const [output, setOutput] = useState(null);
   const [running, setRunning] = useState(false);
   const [isDatasetDragOver, setIsDatasetDragOver] = useState(false);
-  const textareaRef = useRef(null);
+  const editorRef = useRef(null);
+  const cmRef = useRef(null);
 
-  const lineCount = code.split('\n').length;
+  useEffect(() => {
+    if (editorRef.current && !cmRef.current) {
+      cmRef.current = CodeMirror(editorRef.current, {
+        value: code,
+        mode: 'python',
+        theme: 'dracula',
+        lineNumbers: true,
+        matchBrackets: true,
+        autoCloseBrackets: true,
+        indentUnit: 4,
+        tabSize: 4,
+        indentWithTabs: false,
+        lineWrapping: true,
+      });
+      cmRef.current.on('change', (cm) => {
+        setCode(cm.getValue());
+      });
+      cmRef.current.setOption('extraKeys', {
+        'Cmd-Enter': () => handleRun(),
+        'Ctrl-Enter': () => handleRun(),
+      });
+    }
+  }, [panel.dataset]);
 
   const handleRun = async () => {
     if (!panel.dataset) return;
@@ -2165,25 +2195,6 @@ function CodePanel({ panel, onClose, onDrop, isDragging, onPanelDragStart, onPan
     }
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const ta = e.target;
-      const start = ta.selectionStart;
-      const end = ta.selectionEnd;
-      setCode(code.substring(0, start) + '    ' + code.substring(end));
-      setTimeout(() => { ta.selectionStart = ta.selectionEnd = start + 4; }, 0);
-    }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      handleRun();
-    }
-  };
-
-  const handleScroll = (e) => {
-    const lineNums = e.target.previousSibling;
-    if (lineNums) lineNums.scrollTop = e.target.scrollTop;
-  };
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -2245,22 +2256,7 @@ function CodePanel({ panel, onClose, onDrop, isDragging, onPanelDragStart, onPan
           </div>
 
           <div className="code-editor-area">
-            <div className="code-line-numbers">
-              {Array.from({ length: lineCount }, (_, i) => (
-                <div key={i} style={{ padding: '0 6px 0 0', height: '1.75em' }}>{i + 1}</div>
-              ))}
-            </div>
-            <textarea
-              ref={textareaRef}
-              value={code}
-              onChange={e => setCode(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onScroll={handleScroll}
-              placeholder="# 在這裡寫 Python 程式碼..."
-              spellCheck={false}
-              autoComplete="off"
-              autoCorrect="off"
-            />
+            <div ref={editorRef} style={{ flex: 1, minHeight: 0 }} />
           </div>
 
           <div className="code-output-area scrollbar-thin">
@@ -3130,6 +3126,9 @@ function Dashboard({ user }) {
   const [apiOnline, setApiOnline] = useState(null); // null=checking, true=ok, false=down
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'focus'
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [projects, setProjects] = useState(DEFAULT_PROJECTS);
+  const [showAddProject, setShowAddProject] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
 
   useEffect(() => {
     const check = () => fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3000) })
@@ -3140,6 +3139,23 @@ function Dashboard({ user }) {
     return () => clearInterval(t);
   }, []);
 
+  // Fetch projects from backend on mount
+  useEffect(() => {
+    fetch(`${API_BASE}/api/projects`, { signal: AbortSignal.timeout(5000) })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.projects) return;
+        setProjects(prev => {
+          const merged = [...prev];
+          data.projects.forEach(p => {
+            if (!merged.find(m => m.id === p.id)) merged.push(p);
+          });
+          return merged;
+        });
+      })
+      .catch(() => {});
+  }, []);
+
   // Real-time dataset updates via WebSocket (with polling fallback)
   const knownPushedIds = useRef(new Set());
   useEffect(() => {
@@ -3147,11 +3163,18 @@ function Dashboard({ user }) {
     let pollTimer = null;
 
     const handleDatasetEvent = (evt) => {
+      if (evt.type === 'project_new') {
+        const p = evt.project;
+        setProjects(prev => prev.find(m => m.id === p.id) ? prev : [...prev, p]);
+        return;
+      }
       if (evt.type === 'dataset_new') {
         const ds = evt.dataset;
         if (knownPushedIds.current.has(ds.id)) return;
         knownPushedIds.current.add(ds.id);
         const proj = ds.project || 'default';
+        // Auto-add project if unknown
+        setProjects(prev => prev.find(m => m.id === proj) ? prev : [...prev, { id: proj, name: proj, icon: proj[0]?.toUpperCase() || 'P', datasetCount: 0 }]);
         const newDs = {
           id: `pushed_${ds.id}`,
           backendId: ds.id,
@@ -3312,11 +3335,33 @@ function Dashboard({ user }) {
         <div className={`sidebar ${!sidebarOpen ? 'collapsed' : ''}`}
           <div className="sidebar-section">
             <div className="sidebar-label">Projects</div>
-            {PROJECTS.map(p => (
-              <div key={p.id} className={`project-item ${activeProject === p.id ? 'active' : ''}`} onClick={() => setActiveProject(p.id)}>
-                <span className="icon">{p.icon}</span>{p.name}<span className="count">{p.datasetCount}</span>
-              </div>
-            ))}
+            {projects.map(p => {
+              const count = (DATASETS[p.id]?.length || 0) + (allUploadedDatasets[p.id]?.length || 0);
+              return (
+                <div key={p.id} className={`project-item ${activeProject === p.id ? 'active' : ''}`} onClick={() => setActiveProject(p.id)}>
+                  <span className="icon">{p.icon}</span>{p.name}<span className="count">{count}</span>
+                </div>
+              );
+            })}
+            {showAddProject ? (
+              <form style={{ display:'flex', gap:4, padding:'4px 12px' }} onSubmit={e => {
+                e.preventDefault();
+                if (!newProjectName.trim()) return;
+                const name = newProjectName.trim();
+                const id = name.toLowerCase().replace(/\s+/g, '_');
+                fetch(`${API_BASE}/api/projects`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, name }) })
+                  .then(r => r.ok ? r.json() : null)
+                  .then(p => { if(p) setProjects(prev => prev.find(m=>m.id===p.id) ? prev : [...prev, {...p, datasetCount:0}]); })
+                  .catch(() => { setProjects(prev => prev.find(m=>m.id===id) ? prev : [...prev, {id, name, icon: name[0].toUpperCase(), datasetCount:0}]); });
+                setNewProjectName(''); setShowAddProject(false);
+              }}>
+                <input autoFocus value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder="專案名稱" style={{ flex:1, padding:'4px 8px', borderRadius:4, border:'1px solid var(--border)', fontSize:12, fontFamily:'inherit' }} />
+                <button type="submit" className="btn btn-primary" style={{ padding:'4px 8px', fontSize:11 }}>OK</button>
+                <button type="button" className="btn btn-ghost" style={{ padding:'4px 8px', fontSize:11 }} onClick={() => setShowAddProject(false)}>✕</button>
+              </form>
+            ) : (
+              <button className="add-ext-btn" style={{ margin:'4px 12px', width:'calc(100% - 24px)' }} onClick={() => setShowAddProject(true)}>+ 新增</button>
+            )}
           </div>
 
           <div className="sidebar-divider" />
@@ -3375,7 +3420,7 @@ function Dashboard({ user }) {
           <div className="workspace-toolbar">
             <div>
               <div className="workspace-title">分析工作區</div>
-              <div className="workspace-subtitle">{PROJECTS.find(p => p.id === activeProject)?.name} · {panels.length} 個面板</div>
+              <div className="workspace-subtitle">{projects.find(p => p.id === activeProject)?.name} · {panels.length} 個面板</div>
             </div>
             <div className="view-toggle">
               <button className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`} title="並排檢視" onClick={() => setViewMode('grid')}>⊞</button>
