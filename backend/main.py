@@ -1,6 +1,6 @@
-import uuid, time, io, sys, traceback, contextlib
+import uuid, time, io, sys, traceback, contextlib, asyncio, json
 from typing import Any
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -23,6 +23,32 @@ app.add_middleware(
 # ── In-memory store ──
 datasets: dict[str, dict] = {}
 jobs: dict[str, dict] = {}
+
+# ── WebSocket connections ──
+ws_clients: list[WebSocket] = []
+
+
+async def broadcast(event: dict):
+    msg = json.dumps(event)
+    disconnected = []
+    for ws in ws_clients:
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            disconnected.append(ws)
+    for ws in disconnected:
+        ws_clients.remove(ws)
+
+
+@app.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    await ws.accept()
+    ws_clients.append(ws)
+    try:
+        while True:
+            await ws.receive_text()
+    except WebSocketDisconnect:
+        ws_clients.remove(ws)
 
 
 # ── Schemas ──
@@ -57,8 +83,12 @@ def list_datasets(project: str | None = None):
     return {"datasets": items}
 
 
+class AppendData(BaseModel):
+    data: list[dict[str, Any]]
+
+
 @app.post("/api/datasets/push")
-def push_dataset(body: PushDataset):
+async def push_dataset(body: PushDataset):
     ds_id = str(uuid.uuid4())[:8]
     df = pd.DataFrame(body.data)
     ds = {
@@ -72,10 +102,32 @@ def push_dataset(body: PushDataset):
         "icon": "📡",
         "iconBg": "#DDD6FE",
         "data": body.data,
+        "row_count": len(body.data),
+        "col_count": len(df.columns),
         "created_at": time.time(),
     }
     datasets[ds_id] = ds
+    await broadcast({"type": "dataset_new", "dataset": {k: v for k, v in ds.items() if k != "data"}})
     return {"id": ds_id, "message": "Dataset received", "rows": ds["rows"], "cols": ds["cols"]}
+
+
+@app.post("/api/datasets/{ds_id}/append")
+async def append_dataset(ds_id: str, body: AppendData):
+    if ds_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    ds = datasets[ds_id]
+    ds["data"].extend(body.data)
+    ds["rows"] = len(ds["data"])
+    ds["row_count"] = ds["rows"]
+    # Update columns if new fields appear
+    if body.data:
+        new_cols = set(body.data[0].keys()) - set(ds["columns"])
+        if new_cols:
+            ds["columns"].extend(sorted(new_cols))
+            ds["cols"] = len(ds["columns"])
+            ds["col_count"] = ds["cols"]
+    await broadcast({"type": "dataset_updated", "id": ds_id, "rows": ds["rows"], "cols": ds["cols"]})
+    return {"id": ds_id, "rows": ds["rows"], "cols": ds["cols"], "appended": len(body.data)}
 
 
 @app.post("/api/datasets/upload")

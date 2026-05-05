@@ -101,7 +101,22 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   width: var(--sidebar-w); background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex; flex-direction: column; flex-shrink: 0; overflow: hidden;
+  transition: width 0.2s ease, opacity 0.2s ease;
 }
+.sidebar.collapsed {
+  width: 0; border-right: none; overflow: hidden;
+}
+.sidebar.collapsed > * { opacity: 0; pointer-events: none; }
+.sidebar-toggle {
+  position: absolute; top: 60px; left: var(--sidebar-w); z-index: 50;
+  width: 20px; height: 36px; border: 1px solid var(--border); border-left: none;
+  background: var(--surface); border-radius: 0 6px 6px 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 10px; color: var(--text-muted);
+  transition: left 0.2s ease, background 0.15s;
+}
+.sidebar-toggle:hover { background: var(--surface-2); color: var(--text-primary); }
+.sidebar-toggle.collapsed { left: 0; }
 
 .sidebar-section { padding: 16px 16px 8px; }
 
@@ -136,29 +151,31 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .dataset-list { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
 
 .dataset-item {
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
   margin-bottom: 6px; cursor: grab; background: var(--surface);
-  transition: all 0.15s ease; user-select: none;
+  transition: all 0.18s ease; user-select: none;
 }
 
 .dataset-item:hover {
   border-color: var(--border-strong);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06); transform: translateY(-1px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.07); transform: translateY(-1px);
+  background: var(--surface-2, #F9FAFB);
 }
 
-.dataset-item:active { cursor: grabbing; }
+.dataset-item:active { cursor: grabbing; transform: scale(0.98); }
 
 .dataset-icon {
-  width: 28px; height: 28px; border-radius: 6px;
+  width: 32px; height: 32px; border-radius: 8px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace;
+  font-size: 12px; font-weight: 700; font-family: 'DM Mono', monospace;
   color: var(--text-secondary); flex-shrink: 0;
 }
 
 .dataset-meta { flex: 1; min-width: 0; }
-.dataset-name { font-size: 12px; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dataset-info { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--text-muted); margin-top: 1px; }
+.dataset-name { font-size: 13px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dataset-info { font-size: 10px; font-family: 'DM Mono', monospace; color: var(--text-muted); margin-top: 3px; display: flex; gap: 6px; align-items: center; }
+.dataset-stat { background: var(--surface-2, #F3F4F6); padding: 1px 6px; border-radius: 4px; font-size: 10px; }
 .dataset-drag-hint { font-size: 10px; color: var(--text-muted); opacity: 0; transition: opacity 0.15s; }
 .dataset-item:hover .dataset-drag-hint { opacity: 1; }
 
@@ -225,6 +242,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 }
 .upload-tag.csv { background: #DBEAFE; color: #1D4ED8; }
 .upload-tag.sheets { background: #D1FAE5; color: #065F46; }
+.upload-tag.api { background: #EDE9FE; color: #6D28D9; }
 
 /* ── Workspace ── */
 .workspace {
@@ -256,7 +274,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .panel-type-btn.recommend:hover { background: #D1FAE5; }
 
 /* ── Panels Grid ── */
-.panels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; align-items: start; }
+.panels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; align-items: stretch; }
 
 /* ── Panel ── */
 .panel {
@@ -264,6 +282,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   border-radius: 12px; overflow: hidden;
   animation: panel-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   transition: box-shadow 0.2s ease;
+  display: flex; flex-direction: column; min-height: 380px;
 }
 
 .panel:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.07); }
@@ -343,7 +362,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .model-divider::before, .model-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 /* ── Panel Body ── */
-.panel-body { padding: 14px 16px; }
+.panel-body { padding: 14px 16px; flex: 1; }
 
 .drop-zone {
   border: 2px dashed var(--border); border-radius: 8px; padding: 28px;
@@ -698,9 +717,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 }
 
 .code-output-area {
-  flex: 0 1 auto; min-height: 60px; max-height: 50%; overflow-y: auto;
+  flex: 1 1 auto; min-height: 60px; overflow-y: auto;
   background: #FAFAF8; padding: 0;
-  transition: max-height 0.2s ease;
 }
 
 .code-output-header {
@@ -2348,8 +2366,22 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
     setLoading(true); setResult(null);
     try {
       if (model?.type === 'external') {
-        await new Promise(r => setTimeout(r, 1200 + Math.random()*400));
-        setResult(mockExtResult(model.api));
+        const api = model.api;
+        const hdrs = {};
+        (api.headers || []).forEach(h => { if (h.key && h.value) hdrs[h.key] = h.value; });
+        const inputData = ds.source === 'csv' || ds.source === 'sheets'
+          ? ds.data.rows.slice(0, 100)
+          : genSyntheticData(ds).slice(0, 100);
+        const t0 = performance.now();
+        const resp = await fetch(api.url, {
+          method: api.method || 'POST',
+          headers: { 'Content-Type': 'application/json', ...hdrs },
+          body: api.method !== 'GET' ? JSON.stringify({ [api.inputField || 'data']: inputData }) : undefined,
+          signal: AbortSignal.timeout(30000),
+        });
+        const latency = `${Math.round(performance.now() - t0)}ms`;
+        const data = await resp.json().catch(() => ({ raw: await resp.text() }));
+        setResult({ status: resp.status, latency, data });
         return;
       }
       const dsId = await ensureBackendDataset(ds);
@@ -2558,6 +2590,7 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
         const cols = getDatasetCols(panel.dataset);
         return (
           <div className="settings-panel">
+            {panel.type === 'predict' && (
             <div className="settings-row">
               <span className="settings-label">Test 比例</span>
               <div className="settings-split-input">
@@ -2567,6 +2600,7 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
               </div>
               <span className="settings-hint">Train {100-testSplit}% / Test {testSplit}%</span>
             </div>
+            )}
             {cols.length > 0 && (
               <div className="settings-row" style={{ flexDirection:'column', alignItems:'flex-start' }}>
                 <div style={{ display:'flex', alignItems:'center', width:'100%', marginBottom:6 }}>
@@ -2698,15 +2732,29 @@ function AddExtApiModal({ onSave, onClose }) {
     ...f, headers: f.headers.map((h, idx) => idx === i ? { ...h, [k]: v } : h)
   }));
 
-  const handleTest = () => {
+  const handleTest = async () => {
     if (!form.url) return;
     setTesting(true);
     setTestResult(null);
-    setTimeout(() => {
-      const ok = form.url.startsWith('http');
-      setTestResult({ ok, msg: ok ? `連線成功 · 200 OK · ${Math.round(80+Math.random()*200)}ms` : '無效的 URL 格式' });
+    const t0 = performance.now();
+    try {
+      const hdrs = {};
+      form.headers.forEach(h => { if (h.key && h.value) hdrs[h.key] = h.value; });
+      const resp = await fetch(form.url, {
+        method: form.method,
+        headers: { 'Content-Type': 'application/json', ...hdrs },
+        body: form.method !== 'GET' ? JSON.stringify({ [form.inputField || 'data']: 'test' }) : undefined,
+        signal: AbortSignal.timeout(10000),
+      });
+      const latency = Math.round(performance.now() - t0);
+      setTestResult({ ok: resp.ok, msg: resp.ok ? `連線成功 · ${resp.status} · ${latency}ms` : `失敗 · ${resp.status} ${resp.statusText}` });
+    } catch (err) {
+      const latency = Math.round(performance.now() - t0);
+      const msg = err.name === 'TimeoutError' ? `逾時 (>10s)` : err.message || '連線失敗';
+      setTestResult({ ok: false, msg: `${msg} · ${latency}ms` });
+    } finally {
       setTesting(false);
-    }, 1200);
+    }
   };
 
   const handleSave = () => {
@@ -2802,28 +2850,78 @@ function AddExtApiModal({ onSave, onClose }) {
 
 // ── API Docs Modal ──
 function ApiDocsModal({ onClose }) {
+  const [tab, setTab] = useState('rest');
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal wide" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
-          <div><div className="modal-title">資料推送 API</div><div className="modal-sub">後端透過此 endpoint 推送資料</div></div>
+          <div><div className="modal-title">API 串接文件</div><div className="modal-sub">SDK + REST API，即時推送資料到 Dashboard</div></div>
           <button className="panel-btn" onClick={onClose}>✕</button>
         </div>
+        <div style={{ display:'flex', gap:4, padding:'0 20px', borderBottom:'1px solid var(--border)' }}>
+          {['rest','python','js'].map(t => (
+            <button key={t} onClick={() => setTab(t)} style={{ padding:'8px 14px', fontSize:12, fontWeight:500, border:'none', background:'none', cursor:'pointer', borderBottom: tab===t ? '2px solid var(--accent-blue)' : '2px solid transparent', color: tab===t ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+              {t === 'rest' ? 'REST API' : t === 'python' ? 'Python SDK' : 'JavaScript SDK'}
+            </button>
+          ))}
+        </div>
         <div className="modal-body">
-          <div className="endpoint-list">
-            <div className="endpoint-item"><span className="method post">POST</span><span>/api/datasets/push</span><span className="endpoint-desc">推送新資料集</span></div>
-            <div className="endpoint-item"><span className="method get">GET</span><span>/api/datasets</span><span className="endpoint-desc">列出所有資料集</span></div>
-            <div className="endpoint-item"><span className="method post">POST</span><span>/api/analyze/{'{type}'}</span><span className="endpoint-desc">觸發分析任務</span></div>
-          </div>
-          <div className="code-block">
-            <span className="code-comment"># 推送資料範例</span>{'\n'}
-            <span className="code-key">curl</span> -X POST <span className="code-url">https://your-domain.com/api/datasets/push</span>{'\n'}
-            {'  '}-H <span className="code-string">"X-API-Key: sk-xxxx"</span>{'\n'}
-            {'  '}-d <span className="code-string">'{`{ "project": "ecom", "name": "用戶行為", "data": [...] }`}'</span>
-          </div>
-          <div style={{ padding:'10px 14px', background:'#FFFBEB', borderRadius:8, border:'1px solid #FDE68A', fontSize:12, color:'#92400E', lineHeight:1.6 }}>
-            每筆 POST 需帶 <code style={{ fontFamily:'DM Mono', background:'#FEF3C7', padding:'0 3px', borderRadius:3 }}>project</code> 和 <code style={{ fontFamily:'DM Mono', background:'#FEF3C7', padding:'0 3px', borderRadius:3 }}>name</code>，系統自動建立資料集並顯示在側欄。
-          </div>
+          {tab === 'rest' && <>
+            <div className="endpoint-list">
+              <div className="endpoint-item"><span className="method post">POST</span><span>/api/datasets/push</span><span className="endpoint-desc">建立新資料集</span></div>
+              <div className="endpoint-item"><span className="method post">POST</span><span>/api/datasets/:id/append</span><span className="endpoint-desc">追加資料（串流模式）</span></div>
+              <div className="endpoint-item"><span className="method get">GET</span><span>/api/datasets</span><span className="endpoint-desc">列出所有資料集</span></div>
+              <div className="endpoint-item"><span className="method get">WS</span><span>/ws</span><span className="endpoint-desc">即時推播（WebSocket）</span></div>
+              <div className="endpoint-item"><span className="method post">POST</span><span>/api/analyze/{'{type}'}</span><span className="endpoint-desc">觸發分析任務</span></div>
+            </div>
+            <div className="code-block">
+              <span className="code-comment"># 建立資料集</span>{'\n'}
+              <span className="code-key">curl</span> -X POST <span className="code-url">http://localhost:8000/api/datasets/push</span>{'\n'}
+              {'  '}-H <span className="code-string">"Content-Type: application/json"</span>{'\n'}
+              {'  '}-d <span className="code-string">'{`{ "project": "ecom", "name": "用戶行為", "data": [{"age":25},{"age":30}] }`}'</span>{'\n\n'}
+              <span className="code-comment"># 追加資料（append mode）</span>{'\n'}
+              <span className="code-key">curl</span> -X POST <span className="code-url">http://localhost:8000/api/datasets/DATASET_ID/append</span>{'\n'}
+              {'  '}-H <span className="code-string">"Content-Type: application/json"</span>{'\n'}
+              {'  '}-d <span className="code-string">'{`{ "data": [{"age":35},{"age":40}] }`}'</span>
+            </div>
+          </>}
+          {tab === 'python' && <>
+            <div className="code-block">
+              <span className="code-comment"># pip install ml-platform-sdk</span>{'\n'}
+              <span className="code-key">from</span> ml_platform <span className="code-key">import</span> MLPlatform{'\n\n'}
+              client = MLPlatform(<span className="code-string">"http://localhost:8000"</span>){'\n\n'}
+              <span className="code-comment"># 建立資料集並推送</span>{'\n'}
+              ds = client.create_dataset(<span className="code-string">"用戶行為"</span>, project=<span className="code-string">"ecom"</span>){'\n'}
+              ds.push([{'\n'}
+              {'  '}{`{"age": 25, "purchase": 100},`}{'\n'}
+              {'  '}{`{"age": 30, "purchase": 200},`}{'\n'}
+              ]){'\n\n'}
+              <span className="code-comment"># 串流模式：自動每 5 秒 flush</span>{'\n'}
+              <span className="code-key">with</span> client.stream(<span className="code-string">"即時事件"</span>, flush_every=5.0) <span className="code-key">as</span> stream:{'\n'}
+              {'  '}<span className="code-key">for</span> event <span className="code-key">in</span> your_event_source():{'\n'}
+              {'    '}stream.add(event){'\n'}
+            </div>
+            <div style={{ padding:'10px 14px', background:'#EFF6FF', borderRadius:8, border:'1px solid #BFDBFE', fontSize:12, color:'#1E40AF', lineHeight:1.6 }}>
+              串流模式會自動 buffer 資料，每 5 秒或滿 100 筆時自動送出。Dashboard 透過 WebSocket 即時更新。
+            </div>
+          </>}
+          {tab === 'js' && <>
+            <div className="code-block">
+              <span className="code-comment">// npm install ml-platform-sdk</span>{'\n'}
+              <span className="code-key">import</span> {'{ MLPlatform }'} <span className="code-key">from</span> <span className="code-string">'ml-platform-sdk'</span>;{'\n\n'}
+              <span className="code-key">const</span> client = <span className="code-key">new</span> MLPlatform(<span className="code-string">'http://localhost:8000'</span>);{'\n\n'}
+              <span className="code-comment">// 建立資料集並推送</span>{'\n'}
+              <span className="code-key">const</span> ds = <span className="code-key">await</span> client.createDataset(<span className="code-string">'用戶點擊'</span>, {'{ project: \'ecom\' }'});{'\n'}
+              <span className="code-key">await</span> ds.push([{'{ page: \'/home\', clicks: 42 }'}]);{'\n\n'}
+              <span className="code-comment">// 串流模式：每 5 秒自動 flush</span>{'\n'}
+              <span className="code-key">const</span> stream = client.stream(<span className="code-string">'即時事件'</span>, {'{ flushEvery: 5000 }'});{'\n'}
+              stream.add({'{ event: \'click\', ts: Date.now() }'});{'\n'}
+              <span className="code-comment">// 結束時呼叫 stream.close()</span>
+            </div>
+            <div style={{ padding:'10px 14px', background:'#ECFDF5', borderRadius:8, border:'1px solid #A7F3D0', fontSize:12, color:'#065F46', lineHeight:1.6 }}>
+              支援 Node.js 和瀏覽器。串流模式每 5 秒或滿 100 筆自動 flush，Dashboard 即時顯示新資料。
+            </div>
+          </>}
         </div>
       </div>
     </div>
@@ -2971,11 +3069,28 @@ function App() {
 
 function Dashboard({ user }) {
   const [activeProject, setActiveProject] = useState('ecom');
-  const [panels, setPanels] = useState([
-    { id: 'p1', type: 'cluster', dataset: DATASETS.ecom[0] },
-    { id: 'p2', type: 'predict', dataset: DATASETS.ecom[0] },
-    { id: 'p3', type: 'recommend', dataset: null },
-  ]);
+  const defaultPanels = {
+    ecom: [
+      { id: 'p1', type: 'cluster', dataset: DATASETS.ecom[0] },
+      { id: 'p2', type: 'predict', dataset: DATASETS.ecom[0] },
+      { id: 'p3', type: 'recommend', dataset: null },
+    ],
+    bank: [
+      { id: 'p4', type: 'predict', dataset: DATASETS.bank[0] },
+      { id: 'p5', type: 'cluster', dataset: DATASETS.bank[1] },
+    ],
+    health: [
+      { id: 'p6', type: 'cluster', dataset: DATASETS.health[0] },
+      { id: 'p7', type: 'predict', dataset: DATASETS.health[1] },
+      { id: 'p8', type: 'recommend', dataset: null },
+    ],
+  };
+  const [allPanels, setAllPanels] = useState(defaultPanels);
+  const panels = allPanels[activeProject] || [];
+  const setPanels = (updater) => setAllPanels(prev => ({
+    ...prev,
+    [activeProject]: typeof updater === 'function' ? updater(prev[activeProject] || []) : updater,
+  }));
   const [externalApis, setExternalApis] = useState([
     { id: 'ext1', name: 'HuggingFace Inference', url: 'https://api-inference.huggingface.co/models/my-model', method: 'POST', headers: [{ key: 'Authorization', value: 'Bearer hf_xxx' }], inputField: 'inputs' },
   ]);
@@ -2983,6 +3098,7 @@ function Dashboard({ user }) {
   const [showApiDocs, setShowApiDocs] = useState(false);
   const [apiOnline, setApiOnline] = useState(null); // null=checking, true=ok, false=down
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'focus'
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     const check = () => fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3000) })
@@ -2991,6 +3107,77 @@ function Dashboard({ user }) {
     check();
     const t = setInterval(check, 15000);
     return () => clearInterval(t);
+  }, []);
+
+  // Real-time dataset updates via WebSocket (with polling fallback)
+  const knownPushedIds = useRef(new Set());
+  useEffect(() => {
+    let ws = null;
+    let pollTimer = null;
+
+    const handleDatasetEvent = (evt) => {
+      if (evt.type === 'dataset_new') {
+        const ds = evt.dataset;
+        if (knownPushedIds.current.has(ds.id)) return;
+        knownPushedIds.current.add(ds.id);
+        const proj = ds.project || 'default';
+        const newDs = {
+          id: `pushed_${ds.id}`,
+          backendId: ds.id,
+          name: ds.name,
+          icon: ds.name[0]?.toUpperCase() || 'D',
+          rows: ds.row_count || ds.rows || 0,
+          cols: ds.col_count || ds.cols || 0,
+          iconBg: '#E0E7FF',
+          source: 'api',
+        };
+        setAllUploadedDatasets(prev => {
+          const existing = prev[proj] || [];
+          if (existing.some(d => d.id === newDs.id)) return prev;
+          return { ...prev, [proj]: [newDs, ...existing] };
+        });
+      } else if (evt.type === 'dataset_updated') {
+        setAllUploadedDatasets(prev => {
+          const updated = {};
+          for (const [proj, list] of Object.entries(prev)) {
+            updated[proj] = list.map(d =>
+              d.backendId === evt.id ? { ...d, rows: evt.rows, cols: evt.cols } : d
+            );
+          }
+          return updated;
+        });
+      }
+    };
+
+    // Try WebSocket
+    const wsUrl = API_BASE.replace(/^http/, 'ws') + '/ws';
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onmessage = (e) => {
+        try { handleDatasetEvent(JSON.parse(e.data)); } catch {}
+      };
+      ws.onerror = () => { ws.close(); };
+      ws.onclose = () => { startPolling(); };
+    } catch { startPolling(); }
+
+    // Polling fallback
+    function startPolling() {
+      if (pollTimer) return;
+      const poll = () => fetch(`${API_BASE}/api/datasets`, { signal: AbortSignal.timeout(5000) })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data?.datasets) return;
+          data.datasets.forEach(ds => handleDatasetEvent({ type: 'dataset_new', dataset: ds }));
+        })
+        .catch(() => {});
+      poll();
+      pollTimer = setInterval(poll, 10000);
+    }
+
+    return () => {
+      if (ws) ws.close();
+      if (pollTimer) clearInterval(pollTimer);
+    };
   }, []);
   const [activeTab, setActiveTab] = useState('p1');
   const [draggingPanelId, setDraggingPanelId] = useState(null);
@@ -3055,8 +3242,12 @@ function Dashboard({ user }) {
     setDraggingTab(null); setTabDragOver(null);
   };
 
-  const [uploadedDatasets, setUploadedDatasets] = useState([]);
-  const addUploadedDataset = (ds) => setUploadedDatasets(prev => [ds, ...prev]);
+  const [allUploadedDatasets, setAllUploadedDatasets] = useState({});
+  const uploadedDatasets = allUploadedDatasets[activeProject] || [];
+  const addUploadedDataset = (ds) => setAllUploadedDatasets(prev => ({
+    ...prev,
+    [activeProject]: [ds, ...(prev[activeProject] || [])],
+  }));
 
   const datasets = [...(DATASETS[activeProject] || []), ...uploadedDatasets];
   const TYPE_LABEL = { cluster:'分群', predict:'預測', recommend:'推薦', code:'Code' };
@@ -3071,7 +3262,7 @@ function Dashboard({ user }) {
           {apiOnline === null ? 'API: 連線中...' : apiOnline ? `API: Online` : 'API: 離線'}
         </div>
         <div className="topbar-actions">
-          <button className="btn btn-ghost" onClick={() => setShowApiDocs(true)}>⚡ API 串接</button>
+          <button className="btn btn-ghost" onClick={() => setShowApiDocs(true)}>API 串接</button>
           <button className="btn btn-primary">+ 新增 Project</button>
           <div className="topbar-divider" />
           <div className="auth-user">
@@ -3108,10 +3299,12 @@ function Dashboard({ user }) {
                 <div className="dataset-icon" style={{ background: ds.iconBg }}>{ds.icon}</div>
                 <div className="dataset-meta">
                   <div className="dataset-name">{ds.name}</div>
-                  <div className="dataset-info" style={{ display:'flex', gap:5, alignItems:'center' }}>
+                  <div className="dataset-info">
                     {ds.source === 'csv' && <span className="upload-tag csv">CSV</span>}
                     {ds.source === 'sheets' && <span className="upload-tag sheets">Sheets</span>}
-                    {ds.rows.toLocaleString()} rows · {ds.cols} cols
+                    {ds.source === 'api' && <span className="upload-tag api">API</span>}
+                    <span className="dataset-stat">{ds.rows.toLocaleString()} rows</span>
+                    <span className="dataset-stat">{ds.cols} cols</span>
                   </div>
                 </div>
                 <span className="dataset-drag-hint">⠿</span>
