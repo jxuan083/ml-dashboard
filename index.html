@@ -95,7 +95,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .btn-violet { background: #F5F3FF; border-color: #DDD6FE; color: var(--ext-color); }
 .btn-violet:hover { background: #EDE9FE; }
 
-.main { display: flex; flex: 1; overflow: hidden; }
+.main { display: flex; flex: 1; overflow: hidden; position: relative; }
 
 /* ── Sidebar ── */
 .sidebar {
@@ -3304,8 +3304,12 @@ function Dashboard({ user }) {
       </div>
 
       <div className="main">
+        {/* Sidebar Toggle */}
+        <div className={`sidebar-toggle ${!sidebarOpen ? 'collapsed' : ''}`} onClick={() => setSidebarOpen(o => !o)}>
+          {sidebarOpen ? '‹' : '›'}
+        </div>
         {/* Sidebar */}
-        <div className="sidebar">
+        <div className={`sidebar ${!sidebarOpen ? 'collapsed' : ''}`}
           <div className="sidebar-section">
             <div className="sidebar-label">Projects</div>
             {PROJECTS.map(p => (
