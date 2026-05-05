@@ -13,6 +13,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -241,6 +242,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: 500;
 }
 .upload-tag.csv { background: #DBEAFE; color: #1D4ED8; }
+.upload-tag.xlsx { background: #D1FAE5; color: #065F46; }
 .upload-tag.sheets { background: #D1FAE5; color: #065F46; }
 .upload-tag.api { background: #EDE9FE; color: #6D28D9; }
 
@@ -2380,7 +2382,9 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
           signal: AbortSignal.timeout(30000),
         });
         const latency = `${Math.round(performance.now() - t0)}ms`;
-        const data = await resp.json().catch(() => ({ raw: await resp.text() }));
+        const text = await resp.text();
+        let data;
+        try { data = JSON.parse(text); } catch(e) { data = { raw: text }; }
         setResult({ status: resp.status, latency, data });
         return;
       }
@@ -2954,24 +2958,51 @@ function DatasetUploader({ onAdd }) {
   const fileRef = useRef();
 
   const processFile = (file) => {
-    if (!file || !file.name.endsWith('.csv')) { setError('只支援 .csv 檔案'); return; }
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['csv', 'xlsx', 'xls'].includes(ext)) { setError('支援 .csv / .xlsx / .xls'); return; }
     setError('');
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const parsed = parseCSV(e.target.result);
-      if (!parsed) { setError('CSV 格式無法解析'); return; }
-      onAdd({
-        id: `upload_${Date.now()}`,
-        name: file.name.replace('.csv', ''),
-        icon: '📄',
-        iconBg: '#DBEAFE',
-        rows: parsed.rows.length,
-        cols: parsed.headers.length,
-        source: 'csv',
-        data: parsed,
-      });
-    };
-    reader.readAsText(file);
+
+    if (ext === 'csv') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const parsed = parseCSV(e.target.result);
+        if (!parsed) { setError('CSV 格式無法解析'); return; }
+        onAdd({
+          id: `upload_${Date.now()}`,
+          name: file.name.replace('.csv', ''),
+          icon: 'C',
+          iconBg: '#DBEAFE',
+          rows: parsed.rows.length,
+          cols: parsed.headers.length,
+          source: 'csv',
+          data: parsed,
+        });
+      };
+      reader.readAsText(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const wb = XLSX.read(e.target.result, { type: 'array' });
+          const ws = wb.Sheets[wb.SheetNames[0]];
+          const json = XLSX.utils.sheet_to_json(ws, { defval: '' });
+          if (!json.length) { setError('Excel 檔案為空'); return; }
+          const headers = Object.keys(json[0]);
+          onAdd({
+            id: `upload_${Date.now()}`,
+            name: file.name.replace(/\.(xlsx|xls)$/, ''),
+            icon: 'X',
+            iconBg: '#D1FAE5',
+            rows: json.length,
+            cols: headers.length,
+            source: 'xlsx',
+            data: { headers, rows: json },
+          });
+        } catch(e) { setError('Excel 檔案無法解析'); }
+      };
+      reader.readAsArrayBuffer(file);
+    }
   };
 
   const handleFileDrop = (e) => {
@@ -3015,10 +3046,10 @@ function DatasetUploader({ onAdd }) {
         onDragLeave={() => setDragOver(false)}
         onDrop={handleFileDrop}
       >
-        <input ref={fileRef} type="file" accept=".csv" onChange={e => processFile(e.target.files[0])} />
+        <input ref={fileRef} type="file" accept=".csv,.xlsx,.xls" onChange={e => processFile(e.target.files[0])} />
         <div style={{ fontSize: 18, marginBottom: 4 }}>⊕</div>
         <div className="upload-zone-text">
-          <strong>點擊上傳</strong> 或拖曳 CSV 進來
+          <strong>點擊上傳</strong> 或拖曳 CSV / Excel 進來
         </div>
       </div>
 
@@ -3154,11 +3185,11 @@ function Dashboard({ user }) {
     try {
       ws = new WebSocket(wsUrl);
       ws.onmessage = (e) => {
-        try { handleDatasetEvent(JSON.parse(e.data)); } catch {}
+        try { handleDatasetEvent(JSON.parse(e.data)); } catch(err) {}
       };
       ws.onerror = () => { ws.close(); };
       ws.onclose = () => { startPolling(); };
-    } catch { startPolling(); }
+    } catch(e) { startPolling(); }
 
     // Polling fallback
     function startPolling() {
@@ -3301,6 +3332,7 @@ function Dashboard({ user }) {
                   <div className="dataset-name">{ds.name}</div>
                   <div className="dataset-info">
                     {ds.source === 'csv' && <span className="upload-tag csv">CSV</span>}
+                    {ds.source === 'xlsx' && <span className="upload-tag xlsx">Excel</span>}
                     {ds.source === 'sheets' && <span className="upload-tag sheets">Sheets</span>}
                     {ds.source === 'api' && <span className="upload-tag api">API</span>}
                     <span className="dataset-stat">{ds.rows.toLocaleString()} rows</span>
