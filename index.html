@@ -119,7 +119,13 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 
 .project-item:hover { background: var(--surface-2); color: var(--text-primary); }
 .project-item.active { background: var(--surface-2); color: var(--text-primary); font-weight: 500; }
-.project-item .icon { font-size: 14px; flex-shrink: 0; }
+.project-item .icon {
+  width: 22px; height: 22px; border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace;
+  background: var(--surface-2); color: var(--text-secondary); flex-shrink: 0;
+}
+.project-item.active .icon { background: var(--accent-blue); color: white; }
 .project-item .count {
   margin-left: auto; font-size: 10px; font-family: 'DM Mono', monospace;
   background: var(--surface-2); padding: 1px 5px; border-radius: 3px; color: var(--text-muted);
@@ -146,7 +152,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .dataset-icon {
   width: 28px; height: 28px; border-radius: 6px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; flex-shrink: 0;
+  font-size: 11px; font-weight: 700; font-family: 'DM Mono', monospace;
+  color: var(--text-secondary); flex-shrink: 0;
 }
 
 .dataset-meta { flex: 1; min-width: 0; }
@@ -1154,26 +1161,26 @@ async function ensureBackendDataset(ds) {
 
 // ── Static Data ──
 const PROJECTS = [
-  { id: 'ecom', name: '電商分析', icon: '🛒', datasetCount: 3 },
-  { id: 'bank', name: '金融風控', icon: '🏦', datasetCount: 2 },
-  { id: 'health', name: '醫療數據', icon: '⚕️', datasetCount: 4 },
+  { id: 'ecom', name: '電商分析', icon: 'E', datasetCount: 3 },
+  { id: 'bank', name: '金融風控', icon: 'F', datasetCount: 2 },
+  { id: 'health', name: '醫療數據', icon: 'H', datasetCount: 4 },
 ];
 
 const DATASETS = {
   ecom: [
-    { id: 'ds1', name: '用戶購買行為', icon: '👤', rows: 12840, cols: 18, iconBg: '#DBEAFE' },
-    { id: 'ds2', name: '商品點擊紀錄', icon: '🖱️', rows: 98200, cols: 12, iconBg: '#FDE68A' },
-    { id: 'ds3', name: '購物車放棄率', icon: '🛒', rows: 5420, cols: 9, iconBg: '#A7F3D0' },
+    { id: 'ds1', name: '用戶購買行為', icon: 'U', rows: 12840, cols: 18, iconBg: '#DBEAFE' },
+    { id: 'ds2', name: '商品點擊紀錄', icon: 'C', rows: 98200, cols: 12, iconBg: '#FDE68A' },
+    { id: 'ds3', name: '購物車放棄率', icon: 'A', rows: 5420, cols: 9, iconBg: '#A7F3D0' },
   ],
   bank: [
-    { id: 'ds4', name: '交易明細', icon: '💳', rows: 340000, cols: 24, iconBg: '#DDD6FE' },
-    { id: 'ds5', name: '客戶信用評分', icon: '📊', rows: 8900, cols: 31, iconBg: '#FFE4E6' },
+    { id: 'ds4', name: '交易明細', icon: 'T', rows: 340000, cols: 24, iconBg: '#DDD6FE' },
+    { id: 'ds5', name: '客戶信用評分', icon: 'S', rows: 8900, cols: 31, iconBg: '#FFE4E6' },
   ],
   health: [
-    { id: 'ds6', name: '患者就診記錄', icon: '🏥', rows: 23100, cols: 47, iconBg: '#A7F3D0' },
-    { id: 'ds7', name: '用藥追蹤', icon: '💊', rows: 15600, cols: 19, iconBg: '#BFDBFE' },
-    { id: 'ds8', name: '影像標注', icon: '🔬', rows: 4200, cols: 8, iconBg: '#FDE68A' },
-    { id: 'ds9', name: '檢驗數值', icon: '🧪', rows: 61000, cols: 55, iconBg: '#EDE9FE' },
+    { id: 'ds6', name: '患者就診記錄', icon: 'P', rows: 23100, cols: 47, iconBg: '#A7F3D0' },
+    { id: 'ds7', name: '用藥追蹤', icon: 'M', rows: 15600, cols: 19, iconBg: '#BFDBFE' },
+    { id: 'ds8', name: '影像標注', icon: 'I', rows: 4200, cols: 8, iconBg: '#FDE68A' },
+    { id: 'ds9', name: '檢驗數值', icon: 'L', rows: 61000, cols: 55, iconBg: '#EDE9FE' },
   ],
 };
 
@@ -2885,7 +2892,7 @@ function DatasetUploader({ onAdd }) {
         onAdd({
           id: `sheets_${Date.now()}`,
           name: `Sheets ${id.slice(0,8)}...`,
-          icon: '📊',
+          icon: 'D',
           iconBg: '#A7F3D0',
           rows: parsed.rows.length,
           cols: parsed.headers.length,
