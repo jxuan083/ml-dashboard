@@ -2715,6 +2715,181 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
 }
 
 // ── Add External API Modal ──
+function AddProjectModal({ onSave, onClose }) {
+  const [step, setStep] = useState('form'); // 'form' | 'done'
+  const [name, setName] = useState('');
+  const [withApi, setWithApi] = useState(false);
+  const [createdProj, setCreatedProj] = useState(null);
+  const [generatedKey, setGeneratedKey] = useState('');
+  const [copied, setCopied] = useState('');
+
+  const generateApiKey = () => 'mlp_' + Array.from(crypto.getRandomValues(new Uint8Array(24))).map(b => b.toString(16).padStart(2,'0')).join('');
+
+  const handleCreate = () => {
+    if (!name.trim()) return;
+    const projName = name.trim();
+    const projId = projName.toLowerCase().replace(/\s+/g, '_');
+    const proj = { id: projId, name: projName, icon: projName[0].toUpperCase() };
+    const apiKey = withApi ? generateApiKey() : null;
+    setCreatedProj(proj);
+    setGeneratedKey(apiKey || '');
+    onSave(proj, apiKey);
+    if (withApi) {
+      setStep('done');
+    }
+  };
+
+  const handleCopy = (text, label) => {
+    navigator.clipboard.writeText(text);
+    setCopied(label);
+    setTimeout(() => setCopied(''), 2000);
+  };
+
+  const baseUrl = API_BASE;
+  const projId = createdProj?.id || '';
+
+  const snippets = {
+    curl: `curl -X POST ${baseUrl}/api/datasets/push \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: ${generatedKey}" \\
+  -d '{
+    "project": "${projId}",
+    "name": "my_dataset",
+    "data": [{"col1": "val1"}, {"col1": "val2"}]
+  }'`,
+    python: `# ── 原生 requests ──
+import requests
+
+resp = requests.post(
+    "${baseUrl}/api/datasets/push",
+    headers={
+        "Content-Type": "application/json",
+        "X-API-Key": "${generatedKey}",
+    },
+    json={
+        "project": "${projId}",
+        "name": "my_dataset",
+        "data": [{"col1": "val1"}, {"col1": "val2"}],
+    },
+)
+print(resp.json())
+
+# ── SDK（開發中）──
+# pip install ml-platform-sdk
+# from ml_platform import MLPlatform
+# client = MLPlatform("${baseUrl}", api_key="${generatedKey}")
+# ds = client.create_dataset("my_dataset", project="${projId}")
+# ds.push([{"col1": "val1"}, {"col1": "val2"}])`,
+    js: `const resp = await fetch('${baseUrl}/api/datasets/push', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-API-Key': '${generatedKey}',
+  },
+  body: JSON.stringify({
+    project: '${projId}',
+    name: 'my_dataset',
+    data: [{ col1: 'val1' }, { col1: 'val2' }],
+  }),
+});
+const data = await resp.json();
+console.log(data);
+
+// ── SDK（開發中）──
+// import { MLPlatform } from 'ml-platform-sdk';
+// const client = new MLPlatform('${baseUrl}', { apiKey: '${generatedKey}' });
+// const ds = await client.createDataset('my_dataset', { project: '${projId}' });
+// await ds.push([{ col1: 'val1' }, { col1: 'val2' }]);`,
+  };
+
+  const [codeTab, setCodeTab] = useState('curl');
+
+  if (step === 'done') {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal wide" onClick={e => e.stopPropagation()}>
+          <div className="modal-header">
+            <div>
+              <div className="modal-title">專案已建立</div>
+              <div className="modal-sub">{createdProj?.name} -- 複製以下資訊來串接你的後端</div>
+            </div>
+            <button className="panel-btn" onClick={onClose}>✕</button>
+          </div>
+
+          <div className="modal-body">
+            <div className="form-group">
+              <label className="form-label">Project ID</label>
+              <div style={{ display:'flex', gap:6 }}>
+                <input className="form-input mono" readOnly value={projId} style={{ flex:1 }} />
+                <button className="btn btn-ghost" style={{ padding:'4px 10px', fontSize:11, whiteSpace:'nowrap' }} onClick={() => handleCopy(projId, 'id')}>{copied === 'id' ? 'Copied' : 'Copy'}</button>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">API Key</label>
+              <div style={{ display:'flex', gap:6 }}>
+                <input className="form-input mono" readOnly value={generatedKey} style={{ flex:1 }} />
+                <button className="btn btn-ghost" style={{ padding:'4px 10px', fontSize:11, whiteSpace:'nowrap' }} onClick={() => handleCopy(generatedKey, 'key')}>{copied === 'key' ? 'Copied' : 'Copy'}</button>
+              </div>
+              <span style={{ fontSize:10, color:'#DC2626', marginTop:4, display:'block' }}>此 Key 只會顯示一次，請妥善保存</span>
+            </div>
+
+            <div style={{ marginTop:12 }}>
+              <div style={{ display:'flex', gap:4, borderBottom:'1px solid var(--border)', marginBottom:0 }}>
+                {['curl','python','js'].map(t => (
+                  <button key={t} onClick={() => setCodeTab(t)} style={{ padding:'6px 12px', fontSize:11, fontWeight:500, border:'none', background:'none', cursor:'pointer', borderBottom: codeTab===t ? '2px solid var(--accent-blue)' : '2px solid transparent', color: codeTab===t ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                    {t === 'curl' ? 'cURL' : t === 'python' ? 'Python' : 'JavaScript'}
+                  </button>
+                ))}
+                <button className="btn btn-ghost" style={{ marginLeft:'auto', padding:'3px 8px', fontSize:10 }} onClick={() => handleCopy(snippets[codeTab], 'code')}>{copied === 'code' ? 'Copied' : 'Copy Code'}</button>
+              </div>
+              <pre style={{ background:'#1A1917', color:'#E8E6E1', padding:'14px 16px', borderRadius:'0 0 8px 8px', fontSize:11, fontFamily:'DM Mono, monospace', lineHeight:1.7, overflowX:'auto', margin:0, whiteSpace:'pre-wrap', wordBreak:'break-all' }}>{snippets[codeTab]}</pre>
+            </div>
+          </div>
+
+          <div className="modal-footer">
+            <button className="btn btn-primary" onClick={onClose}>完成</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal wide" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">新增專案</div>
+            <div className="modal-sub">建立專案，可選擇開啟 API 串接</div>
+          </div>
+          <button className="panel-btn" onClick={onClose}>✕</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">專案名稱</label>
+            <input className="form-input" autoFocus placeholder="例：電商推薦系統" value={name} onChange={e => setName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleCreate(); }} />
+          </div>
+
+          <div style={{ display:'flex', alignItems:'center', gap:8, margin:'16px 0 4px', cursor:'pointer' }} onClick={() => setWithApi(v => !v)}>
+            <div style={{ width:36, height:20, borderRadius:10, background: withApi ? 'var(--accent-blue)' : 'var(--border)', position:'relative', transition:'background .2s' }}>
+              <div style={{ width:16, height:16, borderRadius:8, background:'white', position:'absolute', top:2, left: withApi ? 18 : 2, transition:'left .2s', boxShadow:'0 1px 3px rgba(0,0,0,.2)' }} />
+            </div>
+            <span style={{ fontSize:13, fontWeight:500, color:'var(--text-primary)' }}>需要 API 串接</span>
+          </div>
+          <span style={{ fontSize:11, color:'var(--text-muted)', marginLeft:44, display:'block' }}>開啟後會自動生成 API Key 和串接範例程式碼</span>
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn btn-ghost" onClick={onClose}>取消</button>
+          <button className="btn btn-primary" onClick={handleCreate} disabled={!name.trim()}>建立專案</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AddExtApiModal({ onSave, onClose }) {
   const [form, setForm] = useState({
     name: '', url: '', method: 'POST',
@@ -3128,7 +3303,6 @@ function Dashboard({ user }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [projects, setProjects] = useState(DEFAULT_PROJECTS);
   const [showAddProject, setShowAddProject] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
 
   useEffect(() => {
     const check = () => fetch(`${API_BASE}/health`, { signal: AbortSignal.timeout(3000) })
@@ -3317,7 +3491,7 @@ function Dashboard({ user }) {
         </div>
         <div className="topbar-actions">
           <button className="btn btn-ghost" onClick={() => setShowApiDocs(true)}>API 串接</button>
-          <button className="btn btn-primary">+ 新增 Project</button>
+          <button className="btn btn-primary" onClick={() => setShowAddProject(true)}>+ 新增 Project</button>
           <div className="topbar-divider" />
           <div className="auth-user">
             <span className="auth-user-email">{user.email}</span>
@@ -3343,25 +3517,7 @@ function Dashboard({ user }) {
                 </div>
               );
             })}
-            {showAddProject ? (
-              <form style={{ display:'flex', gap:4, padding:'4px 12px' }} onSubmit={e => {
-                e.preventDefault();
-                if (!newProjectName.trim()) return;
-                const name = newProjectName.trim();
-                const id = name.toLowerCase().replace(/\s+/g, '_');
-                fetch(`${API_BASE}/api/projects`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id, name }) })
-                  .then(r => r.ok ? r.json() : null)
-                  .then(p => { if(p) setProjects(prev => prev.find(m=>m.id===p.id) ? prev : [...prev, {...p, datasetCount:0}]); })
-                  .catch(() => { setProjects(prev => prev.find(m=>m.id===id) ? prev : [...prev, {id, name, icon: name[0].toUpperCase(), datasetCount:0}]); });
-                setNewProjectName(''); setShowAddProject(false);
-              }}>
-                <input autoFocus value={newProjectName} onChange={e => setNewProjectName(e.target.value)} placeholder="專案名稱" style={{ flex:1, padding:'4px 8px', borderRadius:4, border:'1px solid var(--border)', fontSize:12, fontFamily:'inherit' }} />
-                <button type="submit" className="btn btn-primary" style={{ padding:'4px 8px', fontSize:11 }}>OK</button>
-                <button type="button" className="btn btn-ghost" style={{ padding:'4px 8px', fontSize:11 }} onClick={() => setShowAddProject(false)}>✕</button>
-              </form>
-            ) : (
-              <button className="add-ext-btn" style={{ margin:'4px 12px', width:'calc(100% - 24px)' }} onClick={() => setShowAddProject(true)}>+ 新增</button>
-            )}
+            <button className="add-ext-btn" style={{ margin:'4px 12px', width:'calc(100% - 24px)' }} onClick={() => setShowAddProject(true)}>+ 新增</button>
           </div>
 
           <div className="sidebar-divider" />
@@ -3508,6 +3664,15 @@ function Dashboard({ user }) {
         </div>
       </div>
 
+      {showAddProject && <AddProjectModal onSave={(proj, apiKey) => {
+        fetch(`${API_BASE}/api/projects`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id: proj.id, name: proj.name, api_key: apiKey || undefined }) })
+          .then(r => r.ok ? r.json() : null)
+          .then(p => { if(p) setProjects(prev => prev.find(m=>m.id===p.id) ? prev : [...prev, {...p, datasetCount:0}]); })
+          .catch(() => { setProjects(prev => prev.find(m=>m.id===proj.id) ? prev : [...prev, {...proj, datasetCount:0}]); });
+        setActiveProject(proj.id);
+        // If no API key, close immediately; otherwise modal stays open to show code snippets
+        if (!apiKey) setShowAddProject(false);
+      }} onClose={() => setShowAddProject(false)} />}
       {showAddExt && <AddExtApiModal onSave={saveExtApi} onClose={() => setShowAddExt(false)} />}
       {showApiDocs && <ApiDocsModal onClose={() => setShowApiDocs(false)} />}
     </div>

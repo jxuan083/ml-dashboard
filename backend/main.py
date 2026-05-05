@@ -1,6 +1,6 @@
-import uuid, time, io, sys, traceback, contextlib, asyncio, json
+import uuid, time, io, sys, traceback, contextlib, asyncio, json, secrets, hashlib
 from typing import Any
-from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -28,6 +28,21 @@ projects: dict[str, dict] = {
     "bank": {"id": "bank", "name": "金融風控", "icon": "F"},
     "health": {"id": "health", "name": "醫療數據", "icon": "H"},
 }
+# api_key hash → project_id
+api_keys: dict[str, str] = {}
+
+
+def _hash_key(key: str) -> str:
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
+def verify_api_key(request: Request) -> str | None:
+    """Return project_id if valid API key provided, else None."""
+    key = request.headers.get("x-api-key")
+    if not key:
+        return None
+    h = _hash_key(key)
+    return api_keys.get(h)
 
 # ── WebSocket connections ──
 ws_clients: list[WebSocket] = []
@@ -62,11 +77,11 @@ class CreateProject(BaseModel):
     id: str | None = None
     name: str
     icon: str | None = None
+    api_key: str | None = None
 
 
 @app.get("/api/projects")
 def list_projects():
-    # Compute datasetCount from actual datasets
     result = []
     for p in projects.values():
         count = sum(1 for d in datasets.values() if d.get("project") == p["id"])
@@ -80,8 +95,10 @@ async def create_project(body: CreateProject):
     if proj_id in projects:
         raise HTTPException(409, "Project already exists")
     icon = body.icon or body.name[0].upper()
-    proj = {"id": proj_id, "name": body.name, "icon": icon}
+    proj = {"id": proj_id, "name": body.name, "icon": icon, "has_api": bool(body.api_key)}
     projects[proj_id] = proj
+    if body.api_key:
+        api_keys[_hash_key(body.api_key)] = proj_id
     await broadcast({"type": "project_new", "project": {**proj, "datasetCount": 0}})
     return proj
 
@@ -123,7 +140,13 @@ class AppendData(BaseModel):
 
 
 @app.post("/api/datasets/push")
-async def push_dataset(body: PushDataset):
+async def push_dataset(body: PushDataset, request: Request):
+    # If project has API key enabled, verify it
+    proj = projects.get(body.project)
+    if proj and proj.get("has_api"):
+        authed_proj = verify_api_key(request)
+        if authed_proj != body.project:
+            raise HTTPException(401, "Invalid or missing API key for this project")
     # Auto-create project if it doesn't exist
     if body.project and body.project not in projects:
         proj = {"id": body.project, "name": body.project, "icon": body.project[0].upper()}
