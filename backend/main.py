@@ -103,6 +103,23 @@ async def create_project(body: CreateProject):
     return proj
 
 
+@app.delete("/api/projects/{proj_id}")
+async def delete_project(proj_id: str):
+    if proj_id not in projects:
+        raise HTTPException(404, "Project not found")
+    # Remove associated API keys
+    to_remove = [h for h, pid in api_keys.items() if pid == proj_id]
+    for h in to_remove:
+        del api_keys[h]
+    # Remove associated datasets
+    ds_to_remove = [did for did, d in datasets.items() if d.get("project") == proj_id]
+    for did in ds_to_remove:
+        del datasets[did]
+    del projects[proj_id]
+    await broadcast({"type": "project_deleted", "id": proj_id})
+    return {"ok": True}
+
+
 # ── Schemas ──
 class PushDataset(BaseModel):
     project: str = "default"

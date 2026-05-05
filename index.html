@@ -153,6 +153,12 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   background: var(--surface-2); padding: 1px 5px; border-radius: 3px; color: var(--text-muted);
 }
 .project-item.active .count { background: var(--border); }
+.project-del {
+  display: none; border: none; background: none; color: var(--text-muted); cursor: pointer;
+  font-size: 11px; padding: 2px 4px; border-radius: 3px; margin-left: 4px; line-height: 1;
+}
+.project-del:hover { color: #DC2626; background: #FEE2E2; }
+.project-item:hover .project-del { display: inline-block; }
 
 .sidebar-divider { height: 1px; background: var(--border); margin: 8px 16px; }
 .dataset-list { flex: 1; overflow-y: auto; padding: 0 16px 16px; }
@@ -3342,6 +3348,10 @@ function Dashboard({ user }) {
         setProjects(prev => prev.find(m => m.id === p.id) ? prev : [...prev, p]);
         return;
       }
+      if (evt.type === 'project_deleted') {
+        setProjects(prev => prev.filter(m => m.id !== evt.id));
+        return;
+      }
       if (evt.type === 'dataset_new') {
         const ds = evt.dataset;
         if (knownPushedIds.current.has(ds.id)) return;
@@ -3514,6 +3524,7 @@ function Dashboard({ user }) {
               return (
                 <div key={p.id} className={`project-item ${activeProject === p.id ? 'active' : ''}`} onClick={() => setActiveProject(p.id)}>
                   <span className="icon">{p.icon}</span>{p.name}<span className="count">{count}</span>
+                  <button className="project-del" onClick={e => { e.stopPropagation(); if(confirm(`確定刪除「${p.name}」？專案內的資料集也會一併刪除。`)) { fetch(`${API_BASE}/api/projects/${p.id}`, { method:'DELETE' }).then(r => { if(r.ok) { setProjects(prev => prev.filter(m => m.id !== p.id)); if(activeProject === p.id) setActiveProject(prev => { const remaining = projects.filter(m => m.id !== p.id); return remaining[0]?.id || 'ecom'; }); }}); }}}>✕</button>
                 </div>
               );
             })}
