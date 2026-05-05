@@ -20,8 +20,23 @@ jobs:
       - run: pip install -r requirements.txt pytest httpx
       - run: pytest tests/ -v
 
+  lint-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install @babel/core @babel/cli @babel/preset-react @babel/preset-env
+      - name: Extract and compile JSX
+        run: |
+          sed -n '/<script type="text\/babel">/,/<\/script>/p' index.html | \
+            sed '1d;$d' > /tmp/app.jsx
+          npx babel /tmp/app.jsx --presets=@babel/preset-react,@babel/preset-env --out-file /tmp/app.js
+          echo "Frontend JSX compiled successfully"
+
   deploy:
-    needs: test
+    needs: [test, lint-frontend]
     if: github.ref == 'refs/heads/master' && github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
