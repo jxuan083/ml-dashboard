@@ -17,4 +17,3 @@ node_modules/
 *.key
 credentials.json
 serviceAccountKey.json
-firebase-config.js
