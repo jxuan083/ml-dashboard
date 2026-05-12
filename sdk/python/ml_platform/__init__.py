@@ -3,6 +3,7 @@
 import time
 import threading
 import requests
+from datetime import datetime
 
 __version__ = "0.1.0"
 
@@ -56,6 +57,18 @@ class MLPlatform:
         """Create a streaming dataset with auto-flush."""
         ds = self.create_dataset(name, project)
         return StreamContext(ds, flush_every, batch_size)
+
+    def experiment(self, name: str, project: str = "default", params: dict | None = None) -> "Experiment":
+        """Create an ML experiment for logging training metrics.
+
+        Usage (e.g. in Colab):
+            exp = client.experiment("ResNet-50 lr=0.001")
+            for epoch in range(10):
+                train(...)
+                exp.log({"epoch": epoch, "loss": 0.5, "accuracy": 0.85})
+            exp.log_model({"model": "ResNet-50", "best_acc": 0.92, "params": 1.2e6})
+        """
+        return Experiment(self, name, project, params or {})
 
 
 class Dataset:
@@ -146,3 +159,63 @@ class StreamContext:
     def _timed_flush(self):
         self.flush()
         self._schedule_flush()
+
+
+class Experiment:
+    """Track ML experiment metrics and push them to the dashboard.
+
+    Designed for use in Colab / Jupyter notebooks. Each log() call
+    appends a row to a "metrics" dataset; the dashboard shows it
+    as a live-updating table that can be visualized with built-in charts.
+    """
+
+    def __init__(self, client: MLPlatform, name: str, project: str, params: dict):
+        self.client = client
+        self.name = name
+        self.project = project
+        self.params = params
+        self._step = 0
+        ts = datetime.now().strftime("%m/%d %H:%M")
+        tag = f"{name} ({ts})"
+        self._metrics_ds = client.create_dataset(
+            f"[metrics] {tag}", project=project,
+            data=[{"_experiment": name, "_type": "config", **params}] if params else [],
+        )
+        self._models_ds = None
+
+    @property
+    def id(self) -> str:
+        return self._metrics_ds.id
+
+    def log(self, metrics: dict, step: int | None = None):
+        """Log one row of metrics (e.g. one epoch).
+
+        Args:
+            metrics: dict of metric values, e.g. {"loss": 0.5, "val_acc": 0.85}
+            step: optional step number; auto-increments if omitted
+        """
+        if step is None:
+            step = self._step
+        self._step = step + 1
+        row = {"step": step, **metrics}
+        self._metrics_ds.push([row])
+
+    def log_model(self, info: dict):
+        """Log a trained model's summary (final metrics, hyperparams, etc.)."""
+        if self._models_ds is None:
+            self._models_ds = self.client.create_dataset(
+                f"[models] {self.name}", project=self.project,
+            )
+        self._models_ds.push([{
+            "_experiment": self.name,
+            "_logged_at": datetime.now().isoformat(),
+            **info,
+        }])
+
+    def summary(self) -> dict:
+        """Get the current metrics dataset info."""
+        return self._metrics_ds.info()
+
+    def preview(self, rows: int = 10) -> dict:
+        """Preview the latest logged metrics."""
+        return self._metrics_ds.preview(rows=rows)

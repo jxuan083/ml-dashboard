@@ -1,12 +1,14 @@
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
     accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
 )
+
+from ml.preprocessing import prepare_data
+
 try:
     from xgboost import XGBClassifier
     HAS_XGB = True
@@ -20,29 +22,7 @@ except ImportError:
 
 
 def _prepare(data: list[dict], target_col: str | None = None, feature_cols: list[str] | None = None):
-    df = pd.DataFrame(data)
-    le = LabelEncoder()
-    for col in df.select_dtypes(include=["object"]).columns:
-        df[col] = le.fit_transform(df[col].astype(str))
-
-    all_cols = df.columns.tolist()
-    y_col = target_col if (target_col and target_col in all_cols) else all_cols[-1]
-
-    if feature_cols:
-        feat_cols = [c for c in feature_cols if c in all_cols and c != y_col]
-        if not feat_cols:
-            feat_cols = [c for c in all_cols if c != y_col]
-    else:
-        feat_cols = [c for c in all_cols if c != y_col]
-
-    X = df[feat_cols].fillna(df[feat_cols].median(numeric_only=True))
-    y = df[y_col]
-
-    if y.nunique() > 10:
-        y = pd.qcut(y, q=3, labels=[0, 1, 2], duplicates="drop").astype(int)
-
-    X_scaled = StandardScaler().fit_transform(X)
-    return X_scaled, y.values, feat_cols
+    return prepare_data(data, target_col, feature_cols, encoding="label", scale=True)
 
 
 def _feature_importance(model, feature_cols: list[str]) -> list[dict]:
