@@ -626,6 +626,15 @@ def health():
     return {"status": "ok", "datasets": len(datasets), "jobs": len(jobs)}
 
 
+@app.get("/firebase-config.js")
+def serve_firebase_config():
+    import os
+    for path in ["/app/firebase-config.js", os.path.join(os.path.dirname(__file__), "..", "firebase-config.js")]:
+        if os.path.exists(path):
+            return FileResponse(path, media_type="application/javascript")
+    raise HTTPException(404, "firebase-config.js not found")
+
+
 @app.get("/")
 def serve_frontend():
     # Docker: /app/index.html, local dev: ../index.html
