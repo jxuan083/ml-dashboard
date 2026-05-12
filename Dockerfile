@@ -2,11 +2,13 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
+COPY sdk/ ./sdk/
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ ./backend/
 COPY index.html .
+COPY firebase-config.js .
 
 WORKDIR /app/backend
 
