@@ -13,6 +13,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/theme/dracula.min.css">
@@ -40,6 +41,7 @@
   --predict-color: #D97706;
   --recommend-color: #059669;
   --ext-color: #7C3AED;
+  --automl-color: #DC2626;
   --sidebar-w: 260px;
   --header-h: 52px;
 }
@@ -286,6 +288,8 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .panel-type-btn.predict:hover { background: #FEF3C7; }
 .panel-type-btn.recommend { border-color: #A7F3D0; color: var(--recommend-color); background: #ECFDF5; }
 .panel-type-btn.recommend:hover { background: #D1FAE5; }
+.panel-type-btn.automl { border-color: #FECACA; color: var(--automl-color); background: #FEF2F2; }
+.panel-type-btn.automl:hover { background: #FEE2E2; }
 
 /* ── Panels Grid ── */
 .panels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 16px; align-items: stretch; }
@@ -323,6 +327,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .panel-type-badge.predict { background: #FFFBEB; color: var(--predict-color); }
 .panel-type-badge.recommend { background: #ECFDF5; color: var(--recommend-color); }
 .panel-type-badge.external { background: #F5F3FF; color: var(--ext-color); }
+.panel-type-badge.automl { background: #FEF2F2; color: var(--automl-color); }
 
 .panel-dataset-name { font-size: 13px; font-weight: 500; flex: 1; }
 .panel-dataset-none { font-size: 12px; color: var(--text-muted); font-style: italic; flex: 1; }
@@ -812,6 +817,59 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
   50% { opacity: 0; }
 }
 
+/* ── AutoML Panel ── */
+.automl-panel-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; flex: 1; overflow-y: auto; }
+.automl-config { display: flex; flex-direction: column; gap: 10px; }
+.automl-row { display: flex; align-items: center; gap: 10px; }
+.automl-row label { font-size: 12px; font-weight: 500; min-width: 80px; color: var(--text-secondary); }
+.automl-row select, .automl-row input { font-size: 12px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-2); }
+.automl-row select { flex: 1; }
+.automl-start-btn {
+  padding: 10px 20px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s; font-family: 'DM Sans', sans-serif;
+  background: linear-gradient(135deg, #DC2626, #B91C1C); color: #fff; width: 100%;
+}
+.automl-start-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220,38,38,0.3); }
+.automl-start-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+
+.automl-progress { display: flex; flex-direction: column; gap: 8px; }
+.automl-progress-bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; }
+.automl-progress-fill { height: 100%; background: linear-gradient(90deg, #DC2626, #F59E0B); border-radius: 3px; transition: width 0.3s ease; }
+.automl-stage { font-size: 11px; color: var(--text-muted); }
+.automl-stage-icon { display: inline-block; width: 16px; text-align: center; }
+
+.automl-leaderboard { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.automl-lb-header { display: grid; grid-template-columns: 40px 1fr 100px 80px; padding: 8px 12px; background: var(--surface-2); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.automl-lb-row { display: grid; grid-template-columns: 40px 1fr 100px 80px; padding: 8px 12px; border-top: 1px solid var(--border); font-size: 12px; align-items: center; }
+.automl-lb-row:first-child { border-top: none; }
+.automl-lb-row.best { background: #FEF2F2; }
+.automl-lb-rank { font-weight: 700; color: var(--text-muted); }
+.automl-lb-rank.gold { color: #D97706; }
+.automl-lb-model { font-weight: 500; }
+.automl-lb-score { font-family: 'DM Mono', monospace; font-weight: 500; }
+.automl-lb-std { font-size: 10px; color: var(--text-muted); font-family: 'DM Mono', monospace; }
+
+.automl-ensemble { border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.automl-ens-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+.automl-ens-label { font-weight: 500; text-transform: capitalize; }
+.automl-ens-score { font-family: 'DM Mono', monospace; font-weight: 500; }
+.automl-ens-best { color: #DC2626; font-weight: 700; }
+
+.automl-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.automl-stat { background: var(--surface-2); border-radius: 8px; padding: 10px; text-align: center; }
+.automl-stat-value { font-size: 18px; font-weight: 700; font-family: 'DM Mono', monospace; }
+.automl-stat-label { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+.automl-feat-imp { display: flex; flex-direction: column; gap: 4px; }
+.automl-feat-row { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+.automl-feat-name { min-width: 120px; font-family: 'DM Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.automl-feat-bar-bg { flex: 1; height: 6px; background: var(--surface-2); border-radius: 3px; }
+.automl-feat-bar { height: 100%; background: var(--automl-color); border-radius: 3px; }
+.automl-feat-val { min-width: 40px; text-align: right; font-family: 'DM Mono', monospace; color: var(--text-muted); }
+
+.automl-section-title { font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }
+.automl-duration { font-size: 11px; color: var(--text-muted); text-align: center; margin-top: 4px; }
+
 /* ── View Toggle ── */
 .view-toggle { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 .view-toggle-btn {
@@ -852,6 +910,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 .focus-tab-badge.predict { background: #FFFBEB; color: var(--predict-color); }
 .focus-tab-badge.recommend { background: #ECFDF5; color: var(--recommend-color); }
 .focus-tab-badge.external { background: #F5F3FF; color: var(--ext-color); }
+.focus-tab-badge.automl { background: #FEF2F2; color: var(--automl-color); }
 
 .focus-tab-close {
   width: 16px; height: 16px; display: flex; align-items: center; justify-content: center;
@@ -1064,14 +1123,7 @@ body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--t
 const { useState, useEffect, useRef } = React;
 
 // ── Firebase ──
-const firebaseApp = firebase.initializeApp({
-  apiKey: "AIzaSyAqZwqt3R7k1xsSMFJOA_n86vveddXiw6c",
-  authDomain: "ctbc-proto-2026.firebaseapp.com",
-  projectId: "ctbc-proto-2026",
-  storageBucket: "ctbc-proto-2026.firebasestorage.app",
-  messagingSenderId: "1055821818468",
-  appId: "1:1055821818468:web:87caa0494f2257bb5bcd71",
-});
+const firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
@@ -2149,6 +2201,288 @@ function ModelSelector({ panelType, selectedModel, selectedChart, externalApis, 
 
 // ── Panel ──
 // ── Code Panel ──
+function AutoMLPanel({ panel, onClose, onDrop, isDragging, onPanelDragStart, onPanelDragEnd, onPanelDragOver, onPanelDrop, reorderTarget }) {
+  const [isDatasetDragOver, setIsDatasetDragOver] = useState(false);
+  const [preset, setPreset] = useState('balanced');
+  const [targetCol, setTargetCol] = useState('');
+  const [useEnsemble, setUseEnsemble] = useState(true);
+  const [handleImbalance, setHandleImbalance] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [jobId, setJobId] = useState(null);
+  const [result, setResult] = useState(null);
+  const [stage, setStage] = useState('');
+  const [progress, setProgress] = useState(0);
+  const pollRef = useRef(null);
+
+  useEffect(() => {
+    if (panel.dataset) {
+      const cols = getDatasetCols(panel.dataset);
+      if (cols.length > 0) setTargetCol(cols[cols.length - 1]);
+    }
+  }, [panel.dataset?.id]);
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current); }, []);
+
+  const startAutoML = async () => {
+    if (!panel.dataset || !targetCol) return;
+    setRunning(true); setResult(null); setStage('Queuing...'); setProgress(0);
+    try {
+      const dsId = await ensureBackendDataset(panel.dataset);
+      const resp = await fetch(`${API_BASE}/api/automl/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dataset_id: dsId,
+          target_col: targetCol,
+          preset,
+          use_ensemble: useEnsemble,
+          handle_imbalance: handleImbalance,
+        }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.detail || `API error ${resp.status}`);
+      }
+      const { job_id } = await resp.json();
+      setJobId(job_id);
+      setStage('Pipeline started...');
+
+      pollRef.current = setInterval(async () => {
+        try {
+          const sr = await fetch(`${API_BASE}/api/automl/status/${job_id}`);
+          const data = await sr.json();
+          if (data.status === 'done') {
+            clearInterval(pollRef.current);
+            setResult(data.result);
+            setRunning(false);
+            setProgress(100);
+            setStage('Done');
+          } else if (data.status === 'error') {
+            clearInterval(pollRef.current);
+            setResult({ _error: data.error });
+            setRunning(false);
+          } else if (data.status === 'running') {
+            setStage('Running pipeline...');
+            setProgress(prev => Math.min(prev + 2, 90));
+          }
+        } catch(e) {}
+      }, 2000);
+    } catch (err) {
+      setResult({ _error: err.message });
+      setRunning(false);
+    }
+  };
+
+  const handleDragOver = (e) => { e.preventDefault(); if (onPanelDragOver && isDragging !== panel.id) { onPanelDragOver(panel.id, e); return; } setIsDatasetDragOver(true); };
+  const handleDragLeave = () => setIsDatasetDragOver(false);
+  const handleDrop = (e) => {
+    e.preventDefault(); setIsDatasetDragOver(false);
+    if (isDragging) { onPanelDrop(panel.id); return; }
+    try { const data = JSON.parse(e.dataTransfer.getData('application/json')); onDrop(panel.id, data); } catch(_) {}
+  };
+
+  let panelClass = 'panel';
+  if (isDragging === panel.id) panelClass += ' dragging-panel';
+  else if (reorderTarget === panel.id) panelClass += ' reorder-target-left';
+  else if (isDatasetDragOver) panelClass += ' drop-target';
+
+  const cols = panel.dataset ? getDatasetCols(panel.dataset) : [];
+
+  const bestScore = result && !result._error ? result.best_score : null;
+  const maxFeatImp = result?.feature_importance?.length ? result.feature_importance[0].importance : 1;
+
+  return (
+    <div className={panelClass} onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+      <div className="panel-header">
+        <span className="drag-handle" draggable title="Drag" onDragStart={e => { e.stopPropagation(); onPanelDragStart(panel.id); }} onDragEnd={onPanelDragEnd}>&#x2807;</span>
+        <span className="panel-type-badge automl">AutoML</span>
+        {panel.dataset ? <span className="panel-dataset-name">{panel.dataset.name}</span> : <span className="panel-dataset-none">Drag dataset here...</span>}
+        <div className="panel-actions">
+          <button className="panel-btn" title="Close" onClick={() => onClose(panel.id)}>&#x2715;</button>
+        </div>
+      </div>
+
+      <div className="automl-panel-body">
+        {!panel.dataset ? (
+          <div className={`drop-zone ${isDatasetDragOver ? 'active' : ''}`}>
+            <div className="drop-zone-icon">&#x2295;</div>
+            <div>Drag dataset here</div>
+            <div style={{ marginTop:4, fontSize:11 }}>AutoML will automatically find the best model</div>
+          </div>
+        ) : !result || result._error ? (
+          <>
+            <div className="automl-config">
+              <div className="automl-row">
+                <label>Target</label>
+                <select value={targetCol} onChange={e => setTargetCol(e.target.value)}>
+                  {cols.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="automl-row">
+                <label>Preset</label>
+                <select value={preset} onChange={e => setPreset(e.target.value)}>
+                  <option value="fast">Fast (30 trials, 3-fold)</option>
+                  <option value="balanced">Balanced (60 trials, 5-fold)</option>
+                  <option value="thorough">Thorough (200 trials, 5-fold)</option>
+                  <option value="extreme">Extreme (400 trials, 10-fold)</option>
+                </select>
+              </div>
+              <div className="automl-row">
+                <label>Ensemble</label>
+                <input type="checkbox" checked={useEnsemble} onChange={e => setUseEnsemble(e.target.checked)} />
+              </div>
+              <div className="automl-row">
+                <label>SMOTE</label>
+                <input type="checkbox" checked={handleImbalance} onChange={e => setHandleImbalance(e.target.checked)} />
+              </div>
+            </div>
+
+            {running && (
+              <div className="automl-progress">
+                <div className="automl-progress-bar"><div className="automl-progress-fill" style={{ width: `${progress}%` }} /></div>
+                <div className="automl-stage"><span className="automl-stage-icon">&#x25CF;</span> {stage}</div>
+              </div>
+            )}
+
+            {result?._error && (
+              <div style={{ padding:'12px', color:'#DC2626', fontSize:12, fontFamily:'DM Mono', background:'#FEF2F2', borderRadius:8, border:'1px solid #FECACA' }}>
+                {result._error}
+              </div>
+            )}
+
+            <button className="automl-start-btn" disabled={running || !targetCol} onClick={startAutoML}>
+              {running ? 'Pipeline Running...' : 'Start AutoML Pipeline'}
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Stats */}
+            <div className="automl-stats">
+              <div className="automl-stat">
+                <div className="automl-stat-value">{(bestScore * 100).toFixed(2)}%</div>
+                <div className="automl-stat-label">Best {result.metric}</div>
+              </div>
+              <div className="automl-stat">
+                <div className="automl-stat-value">{result.duration_seconds}s</div>
+                <div className="automl-stat-label">Duration</div>
+              </div>
+              <div className="automl-stat">
+                <div className="automl-stat-value">{result.total_trials}</div>
+                <div className="automl-stat-label">Total Trials</div>
+              </div>
+            </div>
+
+            {/* Feature stats */}
+            {result.feature_stats && (
+              <div className="automl-stats">
+                <div className="automl-stat">
+                  <div className="automl-stat-value">{result.feature_stats.original}</div>
+                  <div className="automl-stat-label">Original Features</div>
+                </div>
+                <div className="automl-stat">
+                  <div className="automl-stat-value">+{result.feature_stats.generated}</div>
+                  <div className="automl-stat-label">Generated</div>
+                </div>
+                <div className="automl-stat">
+                  <div className="automl-stat-value">{result.feature_stats.after_selection}</div>
+                  <div className="automl-stat-label">Selected</div>
+                </div>
+              </div>
+            )}
+
+            {/* Leaderboard */}
+            <div>
+              <div className="automl-section-title">Model Leaderboard</div>
+              <div className="automl-leaderboard">
+                <div className="automl-lb-header">
+                  <div>#</div><div>Model</div><div>Score</div><div>Std</div>
+                </div>
+                {result.leaderboard?.map((m, i) => (
+                  <div key={i} className={`automl-lb-row ${i === 0 ? 'best' : ''}`}>
+                    <div className={`automl-lb-rank ${i === 0 ? 'gold' : ''}`}>{m.rank}</div>
+                    <div className="automl-lb-model">{m.label}</div>
+                    <div className="automl-lb-score">{(m.mean_cv * 100).toFixed(3)}%</div>
+                    <div className="automl-lb-std">{'\u00B1'}{(m.std_cv * 100).toFixed(3)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Ensemble */}
+            {result.ensemble && (
+              <div>
+                <div className="automl-section-title">Ensemble Results</div>
+                <div className="automl-ensemble">
+                  {Object.entries(result.ensemble).map(([type, ens]) => (
+                    <div key={type} className="automl-ens-row">
+                      <span className={`automl-ens-label ${ens.mean_cv >= bestScore ? 'automl-ens-best' : ''}`}>{type}</span>
+                      <span className="automl-ens-score">
+                        {ens.error ? 'Error' : `${(ens.mean_cv * 100).toFixed(3)}%`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Threshold */}
+            {result.threshold && (
+              <div>
+                <div className="automl-section-title">Threshold Optimization</div>
+                <div className="automl-ensemble">
+                  <div className="automl-ens-row">
+                    <span>Default (0.5)</span>
+                    <span className="automl-ens-score">{(result.threshold.f1_at_default * 100).toFixed(2)}%</span>
+                  </div>
+                  <div className="automl-ens-row">
+                    <span className="automl-ens-best">Optimal ({result.threshold.optimal_threshold})</span>
+                    <span className="automl-ens-score automl-ens-best">{(result.threshold.f1_at_optimal * 100).toFixed(2)}%</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Feature Importance */}
+            {result.feature_importance?.length > 0 && (
+              <div>
+                <div className="automl-section-title">Top Features</div>
+                <div className="automl-feat-imp">
+                  {result.feature_importance.slice(0, 10).map((f, i) => (
+                    <div key={i} className="automl-feat-row">
+                      <span className="automl-feat-name" title={f.feature}>{f.feature}</span>
+                      <div className="automl-feat-bar-bg">
+                        <div className="automl-feat-bar" style={{ width: `${(f.importance / maxFeatImp) * 100}%` }} />
+                      </div>
+                      <span className="automl-feat-val">{(f.importance * 100).toFixed(1)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Pipeline stages */}
+            {result.pipeline_stages?.length > 0 && (
+              <div>
+                <div className="automl-section-title">Pipeline Stages</div>
+                <div style={{ fontSize:11, color:'var(--text-muted)', display:'flex', flexDirection:'column', gap:2 }}>
+                  {result.pipeline_stages.filter(s => s.stage.endsWith('_done') || s.stage === 'done').map((s, i) => (
+                    <div key={i}><span style={{ fontFamily:'DM Mono', minWidth:40, display:'inline-block' }}>{s.time}s</span> {s.detail}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button className="automl-start-btn" onClick={() => { setResult(null); setProgress(0); setStage(''); }}>
+              Run Again
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+
 function CodePanel({ panel, onClose, onDrop, isDragging, onPanelDragStart, onPanelDragEnd, onPanelDragOver, onPanelDrop, reorderTarget }) {
   const [code, setCode] = useState(`# 資料集會自動載入為 df (pandas DataFrame)\n# 將結果存入 result 變數即可顯示\n\nprint(df.describe())\nresult = df.head(10)`);
   const [output, setOutput] = useState(null);
@@ -2538,7 +2872,7 @@ function Panel({ panel, externalApis, onClose, onDrop, isDragging, onPanelDragSt
     } catch(_) {}
   };
 
-  const TYPE_CONFIG = { cluster:{ label:'分群分析' }, predict:{ label:'預測分析' }, recommend:{ label:'推薦引擎' } };
+  const TYPE_CONFIG = { cluster:{ label:'分群分析' }, predict:{ label:'預測分析' }, recommend:{ label:'推薦引擎' }, automl:{ label:'AutoML' } };
   const badgeClass = selectedModel?.type === 'external' ? 'external' : panel.type;
   const badgeLabel = selectedModel?.type === 'external' ? `⚡ ${selectedModel.label}` : TYPE_CONFIG[panel.type]?.label;
 
@@ -3488,7 +3822,7 @@ function Dashboard({ user }) {
   }));
 
   const datasets = [...(DATASETS[activeProject] || []), ...uploadedDatasets];
-  const TYPE_LABEL = { cluster:'分群', predict:'預測', recommend:'推薦', code:'Code' };
+  const TYPE_LABEL = { cluster:'分群', predict:'預測', recommend:'推薦', code:'Code', automl:'AutoML' };
 
   return (
     <div className="app">
@@ -3597,6 +3931,7 @@ function Dashboard({ user }) {
               <button className="panel-type-btn cluster" onClick={() => addPanel('cluster')}>+ 分群</button>
               <button className="panel-type-btn predict" onClick={() => addPanel('predict')}>+ 預測</button>
               <button className="panel-type-btn recommend" onClick={() => addPanel('recommend')}>+ 推薦</button>
+              <button className="panel-type-btn automl" onClick={() => addPanel('automl')}>+ AutoML</button>
               <button className="panel-type-btn code" onClick={() => addPanel('code')}>&gt;_ Code</button>
             </div>
           </div>
@@ -3610,7 +3945,7 @@ function Dashboard({ user }) {
           ) : viewMode === 'grid' ? (
             <div className="panels-grid">
               {panels.map(panel => {
-                const PanelComp = panel.type === 'code' ? CodePanel : Panel;
+                const PanelComp = panel.type === 'code' ? CodePanel : panel.type === 'automl' ? AutoMLPanel : Panel;
                 return (
                   <PanelComp
                     key={panel.id}
@@ -3652,7 +3987,7 @@ function Dashboard({ user }) {
               </div>
               <div className="focus-panel-wrap">
                 {panels.filter(p => p.id === activeTab).map(panel => {
-                  const PanelComp = panel.type === 'code' ? CodePanel : Panel;
+                  const PanelComp = panel.type === 'code' ? CodePanel : panel.type === 'automl' ? AutoMLPanel : Panel;
                   return (
                     <PanelComp
                       key={panel.id}

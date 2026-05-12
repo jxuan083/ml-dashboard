@@ -7,3 +7,8 @@ numpy
 scipy
 httpx
 python-multipart
+optuna
+imbalanced-learn
+xgboost
+lightgbm
+-e ../sdk/python

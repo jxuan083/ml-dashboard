@@ -1,8 +1,9 @@
 import uuid, time, io, sys, traceback, contextlib, asyncio, json, secrets, hashlib
+from concurrent.futures import ProcessPoolExecutor
 from typing import Any
 from fastapi import FastAPI, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 import pandas as pd
 import numpy as np
@@ -10,6 +11,7 @@ import numpy as np
 from ml.cluster import run_cluster
 from ml.predict import run_predict
 from ml.recommend import run_recommend
+from ml.automl import run_automl
 
 app = FastAPI(title="ML Platform API", version="1.0.0")
 
@@ -436,6 +438,189 @@ def run_code(body: CodeRunRequest):
     }
 
 
+# ── AutoML endpoints ──
+
+automl_semaphore = asyncio.Semaphore(1)
+
+class AutoMLRequest(BaseModel):
+    dataset_id: str
+    target_col: str
+    feature_cols: list[str] = []
+    metric: str | None = None
+    preset: str = "balanced"
+    models: list[str] = []
+    use_ensemble: bool = True
+    handle_imbalance: bool = False
+
+
+def _run_automl_sync(data: list[dict], config: dict) -> dict:
+    """Run AutoML in a subprocess (ProcessPoolExecutor)."""
+    return run_automl(data, config)
+
+
+async def _run_automl_job(job_id: str, data: list[dict], config: dict):
+    """Background task for AutoML with progress broadcasting."""
+    loop = asyncio.get_event_loop()
+
+    async with automl_semaphore:
+        jobs[job_id]["status"] = "running"
+        await broadcast({"type": "automl_progress", "job_id": job_id, "stage": "preparing", "pct": 0})
+
+        try:
+            executor = ProcessPoolExecutor(max_workers=1)
+            result = await loop.run_in_executor(executor, _run_automl_sync, data, config)
+            executor.shutdown(wait=False)
+
+            jobs[job_id]["status"] = "done"
+            jobs[job_id]["result"] = result
+            await broadcast({"type": "automl_done", "job_id": job_id, "result": result})
+        except Exception as e:
+            jobs[job_id]["status"] = "error"
+            jobs[job_id]["error"] = str(e)
+            await broadcast({"type": "automl_error", "job_id": job_id, "error": str(e)})
+
+
+@app.post("/api/automl/run")
+async def start_automl(body: AutoMLRequest):
+    if body.dataset_id not in datasets:
+        raise HTTPException(404, "Dataset not found")
+    data = datasets[body.dataset_id]["data"]
+    if not data:
+        raise HTTPException(400, "Dataset is empty")
+
+    if automl_semaphore.locked():
+        raise HTTPException(429, "Another AutoML job is already running. Please wait.")
+
+    job_id = str(uuid.uuid4())[:8]
+    config = body.model_dump()
+    config.pop("dataset_id")
+
+    jobs[job_id] = {
+        "id": job_id,
+        "type": "automl",
+        "status": "queued",
+        "dataset_id": body.dataset_id,
+        "config": config,
+        "created_at": time.time(),
+    }
+
+    asyncio.create_task(_run_automl_job(job_id, data, config))
+    return {"job_id": job_id, "status": "queued"}
+
+
+@app.get("/api/automl/status/{job_id}")
+def automl_status(job_id: str):
+    if job_id not in jobs:
+        raise HTTPException(404, "Job not found")
+    job = jobs[job_id]
+    return {
+        "job_id": job_id,
+        "status": job.get("status"),
+        "result": job.get("result"),
+        "error": job.get("error"),
+    }
+
+
+class AutoMLExportRequest(BaseModel):
+    job_id: str
+    test_dataset_id: str
+    id_col: str | None = None
+
+
+@app.post("/api/automl/export")
+async def automl_export(body: AutoMLExportRequest):
+    if body.job_id not in jobs:
+        raise HTTPException(404, "Job not found")
+    job = jobs[body.job_id]
+    if job.get("status") != "done" or not job.get("result"):
+        raise HTTPException(400, "AutoML job not completed")
+    if body.test_dataset_id not in datasets:
+        raise HTTPException(404, "Test dataset not found")
+
+    result = job["result"]
+    test_data = datasets[body.test_dataset_id]["data"]
+    config = result["config"]
+    task = result.get("task", "classification")
+
+    from ml.automl import _make_model
+    from ml.preprocessing import PreprocessingPipeline
+    from ml.feature_engineering import AutoFeatureEngineer
+    from ml.feature_selection import AutoFeatureSelector
+
+    best = result["leaderboard"][0]
+    model_type = best["model_type"]
+    best_params = best["best_params"]
+
+    # Rebuild pipeline on train data
+    train_data = datasets[job["dataset_id"]]["data"]
+
+    pp = PreprocessingPipeline()
+    X_df, y, feat_names, _ = pp.fit_transform(
+        train_data, target_col=config.get("target_col"),
+        feature_cols=config.get("feature_cols") or None, scale=False,
+    )
+
+    fe = AutoFeatureEngineer()
+    X_df = fe.fit_transform(X_df, pd.Series(y))
+    all_features = list(X_df.columns)
+
+    fs = AutoFeatureSelector(task=task)
+    X_train, selected = fs.fit_transform(X_df, y, all_features)
+
+    model = _make_model(model_type, best_params, task)
+    model.fit(X_train, y)
+
+    # Transform test data through same pipeline
+    X_test_df = pp.transform(test_data)
+    X_test_df = fe.transform(X_test_df)
+    X_test = fs.transform(X_test_df, list(X_test_df.columns))
+
+    preds = model.predict(X_test)
+
+    # Apply threshold optimization for binary classification
+    threshold = result.get("threshold")
+    if threshold and task == "classification" and hasattr(model, "predict_proba"):
+        try:
+            proba = model.predict_proba(X_test)[:, 1]
+            preds = (proba >= threshold["optimal_threshold"]).astype(int)
+        except Exception:
+            pass
+
+    # Build submission CSV
+    test_df = pd.DataFrame(test_data)
+    if body.id_col and body.id_col in test_df.columns:
+        submission = pd.DataFrame({"id": test_df[body.id_col], "prediction": preds})
+    else:
+        submission = pd.DataFrame({"id": range(len(preds)), "prediction": preds})
+
+    buf = io.StringIO()
+    submission.to_csv(buf, index=False)
+    buf.seek(0)
+
+    return StreamingResponse(
+        io.BytesIO(buf.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=submission.csv"},
+    )
+
+
+# ── TTL cleanup for old jobs ──
+
+async def _cleanup_old_jobs():
+    """Remove jobs older than 1 hour."""
+    while True:
+        await asyncio.sleep(300)  # check every 5 minutes
+        cutoff = time.time() - 3600
+        expired = [jid for jid, j in jobs.items() if j.get("created_at", 0) < cutoff]
+        for jid in expired:
+            del jobs[jid]
+
+
+@app.on_event("startup")
+async def startup_tasks():
+    asyncio.create_task(_cleanup_old_jobs())
+
+
 @app.get("/health")
 def health():
     return {"status": "ok", "datasets": len(datasets), "jobs": len(jobs)}
@@ -443,4 +628,9 @@ def health():
 
 @app.get("/")
 def serve_frontend():
-    return FileResponse("/app/index.html", media_type="text/html")
+    # Docker: /app/index.html, local dev: ../index.html
+    import os
+    for path in ["/app/index.html", os.path.join(os.path.dirname(__file__), "..", "index.html")]:
+        if os.path.exists(path):
+            return FileResponse(path, media_type="text/html")
+    raise HTTPException(404, "index.html not found")
